@@ -110,3 +110,48 @@ func TestNvmrcWithMissingVersionFails(t *testing.T) {
 		t.Fatalf("exit=%d output:\n%s", code, out)
 	}
 }
+
+func TestBuildCommandUsesDetectedPackageManager(t *testing.T) {
+	for _, c := range []struct{ lockfile, pm string }{{"pnpm-lock.yaml", "pnpm"}, {"yarn.lock", "yarn"}, {"bun.lock", "bun"}} {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{}`), 0o644)
+		os.WriteFile(filepath.Join(dir, c.lockfile), nil, 0o644)
+		run, _ := BuildCommand(task.Spec{ProjectPath: dir, Kind: task.KindScript, Dir: ".", Script: "dev"})
+		install, _ := BuildCommand(task.Spec{ProjectPath: dir, Kind: task.KindInstall})
+		if !strings.HasSuffix(run, c.pm+" run 'dev'") || !strings.HasSuffix(install, c.pm+" install") {
+			t.Errorf("%s:\nrun=%s\ninstall=%s", c.pm, run, install)
+		}
+	}
+}
+
+// runPMCommand runs a script task of a pnpm project; withPnpm puts a fake pnpm on PATH.
+func runPMCommand(t *testing.T, withPnpm bool) (string, int) {
+	t.Helper()
+	project := t.TempDir()
+	os.WriteFile(filepath.Join(project, "package.json"), []byte(`{}`), 0o644)
+	os.WriteFile(filepath.Join(project, "pnpm-lock.yaml"), nil, 0o644)
+	bin := t.TempDir()
+	if withPnpm {
+		os.WriteFile(filepath.Join(bin, "pnpm"), []byte("#!/bin/sh\necho fake pnpm \"$@\"\n"), 0o755)
+	}
+	cmdline, err := BuildCommand(task.Spec{ProjectPath: project, Kind: task.KindScript, Dir: ".", Script: "dev"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("/bin/sh", "-c", cmdline)
+	cmd.Dir = project
+	cmd.Env = []string{"HOME=" + t.TempDir(), "PATH=" + bin + ":/usr/bin:/bin"}
+	out, _ := cmd.CombinedOutput()
+	return string(out), cmd.ProcessState.ExitCode()
+}
+
+func TestMissingPackageManagerHasClearError(t *testing.T) {
+	out, code := runPMCommand(t, false)
+	if code != 127 || !strings.Contains(out, "blixa: pnpm is not installed") {
+		t.Fatalf("exit=%d output:\n%s", code, out)
+	}
+	out, code = runPMCommand(t, true)
+	if code != 0 || !strings.Contains(out, "fake pnpm run dev") {
+		t.Fatalf("exit=%d output:\n%s", code, out)
+	}
+}

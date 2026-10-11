@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"blixa/internal/discovery"
 	"blixa/internal/task"
 )
 
@@ -16,6 +17,7 @@ const nvmLoad = `export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"; [ -s "$NVM_DIR/nvm.sh"
 
 // BuildCommand: the shell command for the task (the login shell's `-lc` argument).
 func BuildCommand(s task.Spec) (string, error) {
+	pm := discovery.DetectPackageManager(s.ProjectPath)
 	var cmd string
 	switch s.Kind {
 	case task.KindPull:
@@ -26,15 +28,17 @@ func BuildCommand(s task.Spec) (string, error) {
 		}
 		return "git checkout " + shellQuote(s.Branch), nil
 	case task.KindInstall:
-		cmd = "npm install"
+		cmd = pm + " install"
 	case task.KindScript:
 		if s.Script == "" {
 			return "", errors.New("missing script name")
 		}
-		cmd = "npm run " + shellQuote(s.Script)
+		cmd = pm + " run " + shellQuote(s.Script)
 	default:
 		return "", fmt.Errorf("unknown task kind: %q", s.Kind)
 	}
+	// The package manager may come from nvm (or corepack under it), so check it after nvm is set up.
+	cmd = `command -v ` + pm + ` >/dev/null 2>&1 || { echo "blixa: ` + pm + ` is not installed"; exit 127; }; ` + cmd
 	nvmrc := filepath.Join(s.ProjectPath, ".nvmrc")
 	if _, err := os.Stat(nvmrc); err == nil {
 		// The .nvmrc is only honoured when nvm is available; without nvm the system

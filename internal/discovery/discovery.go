@@ -16,11 +16,12 @@ type Script struct {
 }
 
 type Project struct {
-	Name     string
-	Path     string
-	HasNvmrc bool
-	IsGit    bool // git operations (pull, checkout, branch status) only apply to git repos
-	Scripts  []Script
+	Name           string
+	Path           string
+	HasNvmrc       bool
+	IsGit          bool   // git operations (pull, checkout, branch status) only apply to git repos
+	PackageManager string // npm, pnpm, yarn or bun (see DetectPackageManager)
+	Scripts        []Script
 }
 
 type packageJSON struct {
@@ -62,6 +63,8 @@ func LoadProject(path string) (Project, error) {
 		Path:     path,
 		HasNvmrc: exists(filepath.Join(path, ".nvmrc")),
 		IsGit:    exists(filepath.Join(path, ".git")),
+
+		PackageManager: DetectPackageManager(path),
 	}
 	proj.Scripts = append(proj.Scripts, scriptsOf(".", rootPkg)...)
 	for _, dir := range workspaceDirs(path, rootPkg) {
@@ -97,9 +100,13 @@ func scriptsOf(dir string, pkg packageJSON) []Script {
 	return out
 }
 
-// workspaceDirs: the workspace directories; without a "workspaces" field, apps/* and packages/*.
+// workspaceDirs: the workspace directories — from pnpm-workspace.yaml, else the "workspaces"
+// field, else apps/* and packages/*.
 func workspaceDirs(root string, pkg packageJSON) []string {
-	patterns := workspacePatterns(pkg.Workspaces)
+	patterns := pnpmWorkspacePatterns(root)
+	if patterns == nil {
+		patterns = workspacePatterns(pkg.Workspaces)
+	}
 	if patterns == nil {
 		patterns = []string{"apps/*", "packages/*"}
 	}

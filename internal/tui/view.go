@@ -159,7 +159,11 @@ func (m Model) rowSegs(r row, c columns) []seg {
 		} else {
 			segs = append(segs, gitSegs(fit(gitTextWidth(st, ok, c.git), c.git))...)
 		}
-		return append(segs, seg{"  ", stylePlain}, seg{builtinText(builtin), statusStyle(builtin)})
+		segs = append(segs, seg{"  ", stylePlain}, seg{builtinText(builtin), statusStyle(builtin)})
+		if p, found := m.project(r.project); found && p.PackageManager != "" && p.PackageManager != "npm" {
+			segs = append(segs, seg{"  " + p.PackageManager, styleDim}) // npm is the default, so it isn't shown
+		}
+		return segs
 	}
 	var info *task.Info
 	if i, ok := m.tasks[r.spec.ID()]; ok {

@@ -52,12 +52,22 @@ optional: pull/checkout/branch status are only available for projects that are a
 repository (i.e. have a `.git` directory); a non-git project still shows up, just without
 those operations.
 
-A project's scripts come from the root `package.json`, plus:
-- its npm/yarn workspaces (the `workspaces` field, as an array or as `{"packages": [...]}`), or
-- `apps/*` and `packages/*`, when there's no `workspaces` field.
+A project's scripts come from the root `package.json`, plus its workspaces:
+- the `packages` list of `pnpm-workspace.yaml`, or
+- the `workspaces` field of `package.json` (npm/yarn/bun, as an array or as `{"packages": [...]}`), or
+- `apps/*` and `packages/*`, when neither exists.
 
-npm is run via nvm when the project has an `.nvmrc` file, falling back to npm on `PATH`
-otherwise.
+### Package managers
+
+npm, pnpm, yarn and bun are supported. The package manager is detected per project — from the
+`packageManager` field of `package.json` (corepack) first, then the lockfile (`pnpm-lock.yaml`,
+`yarn.lock`, `bun.lock`/`bun.lockb`, `package-lock.json`), npm by default — and used for both
+running scripts (`<pm> run <script>`) and installs (`<pm> install`). The project row shows the
+package manager when it isn't npm. If the detected one isn't installed, the task fails with
+`blixa: <pm> is not installed`.
+
+nvm is optional: when it's installed and the project has an `.nvmrc`, blixa switches to that
+Node version first; otherwise the system node on `PATH` is used.
 
 - Config: `~/.config/blixa/config.json` (`root`, and the selected scripts per project, kept
   separately for every root — switching with `--root` and back restores the selections)

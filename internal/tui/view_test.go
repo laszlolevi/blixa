@@ -129,3 +129,17 @@ func TestColumnsAlignAndLongBranchIsTruncated(t *testing.T) {
 		t.Fatalf("the long branch should be truncated, the ↓2 must remain: %q", proj)
 	}
 }
+
+func TestProjectRowShowsNonNpmPackageManager(t *testing.T) {
+	m, _ := testModel(t)
+	m.projects[0].PackageManager = "pnpm"
+	m.projects[1].PackageManager = "npm"
+	m.showAll = true
+	rows := m.rows()
+	cols := m.columns(rows)
+	alpha := m.renderRow(rows[0], cols)
+	beta := m.renderRow(rows[len(rows)-1], cols)
+	if !strings.Contains(alpha, "pnpm") || strings.Contains(beta, "npm") {
+		t.Fatalf("pnpm tag expected only on the pnpm project:\n%q\n%q", alpha, beta)
+	}
+}
