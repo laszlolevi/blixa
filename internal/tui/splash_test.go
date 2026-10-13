@@ -23,7 +23,7 @@ func TestSplashShowsLogoUntilMinTimeAndScan(t *testing.T) {
 	m, _ := splashModel(t)
 	m.scanned = false
 	m = update(t, m, windowSize(80, 24))
-	if out := ansi.Strip(m.View()); !strings.Contains(out, "███") || !strings.Contains(out, "terminal UI for npm projects") {
+	if out := ansi.Strip(m.View()); !strings.Contains(out, "███") || !strings.Contains(out, "terminal UI for npm, pnpm, yarn & bun projects") {
 		t.Fatalf("splash with the big logo expected:\n%s", out)
 	}
 	m = update(t, m, splashDoneMsg{})

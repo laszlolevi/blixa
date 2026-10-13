@@ -13,7 +13,7 @@ import (
 // splashMinDuration: the splash stays at least this long, so it doesn't just flash by.
 const splashMinDuration = 800 * time.Millisecond
 
-const tagline = "terminal UI for npm projects"
+const tagline = "terminal UI for npm, pnpm, yarn & bun projects"
 
 var bigLogo = []string{
 	"██████╗ ██╗     ██╗██╗  ██╗ █████╗ ",

@@ -1,8 +1,9 @@
 # blixa
 
-A terminal UI for npm projects: git pull / checkout, npm install, and running
-arbitrary npm scripts. Scripts keep running in a background daemon even after the TUI
-closes; blixa automatically detects their ports.
+A terminal UI for npm, pnpm, yarn & bun projects: git pull / checkout, installing
+dependencies, and running arbitrary package scripts, each with the project's own package
+manager. Scripts keep running in a background daemon even after the TUI closes; blixa
+automatically detects their ports.
 
 ## Install
 

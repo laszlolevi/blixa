@@ -1,4 +1,4 @@
-// Package discovery finds npm projects under root and their scripts.
+// Package discovery finds npm, pnpm, yarn & bun projects under root and their scripts.
 package discovery
 
 import (

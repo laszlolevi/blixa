@@ -1,4 +1,4 @@
-// blixa: a terminal UI for managing npm projects.
+// blixa: a terminal UI for managing npm, pnpm, yarn & bun projects.
 package main
 
 import (
@@ -71,7 +71,7 @@ func runTUI(rootFlag string) error {
 		ConfigPath: cfgPath,
 		StateDir:   paths.StateDir(),
 		Splash:     true,
-		Version:    ver,
+		Version:    version.Tag(),
 		Subscribe:  func() (<-chan []task.Info, error) { return c.Subscribe(context.Background()) },
 		StreamLog:  c.StreamLog,
 		Scan:       discovery.Scan,
