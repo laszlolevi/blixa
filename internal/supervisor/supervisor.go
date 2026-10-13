@@ -357,6 +357,9 @@ func (s *Supervisor) poll() {
 			if len(ports) > 0 {
 				e.info.LastPort = ports[0]
 				e.info.Status = task.Transition(e.info.Status, task.EventPortOpened)
+				if e.info.RunningAt.IsZero() {
+					e.info.RunningAt = time.Now()
+				}
 			}
 			s.changedLocked()
 		}

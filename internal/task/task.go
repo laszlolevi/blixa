@@ -110,6 +110,7 @@ type Info struct {
 	LastPort  int       `json:"lastPort,omitempty"`
 	ExitCode  int       `json:"exitCode"`
 	StartedAt time.Time `json:"startedAt"`
+	RunningAt time.Time `json:"runningAt,omitempty"` // when the first LISTEN port showed up
 	EndedAt   time.Time `json:"endedAt,omitempty"`
 	Adopted   bool      `json:"adopted,omitempty"`
 	// ProcStart: the group leader process's start time (e.g. `ps -o lstart=`), so that

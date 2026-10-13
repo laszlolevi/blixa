@@ -98,6 +98,7 @@ const (
 	maxNameWidth = 40
 	maxGitWidth  = 36
 	statusWidth  = 12
+	minPortWidth = 10 // ":65535 +12", reserved so the duration doesn't jump when a port shows up
 )
 
 const noGit = "no git"
@@ -110,7 +111,7 @@ type columns struct {
 }
 
 func (m Model) columns(rows []row) columns {
-	c := columns{name: 10}
+	c := columns{name: 10, port: minPortWidth}
 	for _, r := range rows {
 		if r.kind == rowProject {
 			c.name = max(c.name, 2+runewidth.StringWidth(r.project))

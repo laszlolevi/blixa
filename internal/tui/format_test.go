@@ -45,6 +45,13 @@ func TestPortAndDuration(t *testing.T) {
 	if got := durationText(running, now); got != "2h13m" {
 		t.Errorf("running: %q", got)
 	}
+	fromRunning := &task.Info{Status: task.StatusRunning, StartedAt: start, RunningAt: start.Add(time.Hour)}
+	if got := durationText(fromRunning, now); got != "1h13m" {
+		t.Errorf("from running: %q", got)
+	}
+	if got := durationText(&task.Info{Status: task.StatusStarting, StartedAt: start}, now); got != "" {
+		t.Errorf("starting: %q", got)
+	}
 	ended := &task.Info{Status: task.StatusExited, StartedAt: start, EndedAt: start.Add(102 * time.Second)}
 	if got := durationText(ended, now); got != "1m42s" {
 		t.Errorf("ended: %q", got)

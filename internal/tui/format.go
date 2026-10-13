@@ -49,15 +49,24 @@ func portText(info *task.Info) string {
 	return s
 }
 
+// durationText: counts from when the task reached "running"; nothing while it's still starting.
+// A task that never got there (e.g. a one-off script) shows its total run time once it ended.
 func durationText(info *task.Info, now time.Time) string {
-	if info == nil || info.StartedAt.IsZero() {
+	if info == nil || info.Status == task.StatusStarting {
+		return ""
+	}
+	start := info.RunningAt
+	if start.IsZero() {
+		start = info.StartedAt // never reached running, or persisted before RunningAt existed
+	}
+	if start.IsZero() {
 		return ""
 	}
 	end := now
 	if !info.Status.Active() && !info.EndedAt.IsZero() {
 		end = info.EndedAt
 	}
-	return formatDuration(end.Sub(info.StartedAt))
+	return formatDuration(end.Sub(start))
 }
 
 func formatDuration(d time.Duration) string {
