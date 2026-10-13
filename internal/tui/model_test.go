@@ -364,3 +364,67 @@ func TestNonGitProject(t *testing.T) {
 		}
 	}
 }
+
+// TestRescanAddsAndRemovesProjects: a rescan while running picks up new and deleted
+// projects, keeps the cursor on the same row and fetches git status only for new projects.
+func TestRescanAddsAndRemovesProjects(t *testing.T) {
+	m, _ := testModel(t)
+	m, _ = press(t, m, "a", "down", "down", "down") // P:alpha T:start T:apps/web › dev [P:beta]
+	if r := m.rows()[m.cursor]; r.project != "beta" {
+		t.Fatalf("cursor on %v", r)
+	}
+
+	added := append([]discovery.Project{{Name: "aaa", Path: "/w/aaa", IsGit: true}}, sampleProjects()...)
+	next, cmd := m.Update(projectsMsg{projects: added})
+	m = next.(Model)
+	if got := labels(m.rows()); !eq(got, []string{"P:aaa", "P:alpha", "T:start", "T:apps/web › dev", "P:beta"}) {
+		t.Fatalf("rows after add: %v", got)
+	}
+	if r := m.rows()[m.cursor]; r.project != "beta" {
+		t.Fatalf("cursor moved to %v", r)
+	}
+	msg, ok := run(t, cmd).(gitMsg)
+	if !ok || msg.project != "aaa" {
+		t.Fatalf("expected a git refresh of aaa only, got %#v", msg)
+	}
+	m = update(t, m, msg)
+
+	m = update(t, m, projectsMsg{projects: sampleProjects()[:1]})
+	if got := labels(m.rows()); !eq(got, []string{"P:alpha", "T:start", "T:apps/web › dev"}) {
+		t.Fatalf("rows after removal: %v", got)
+	}
+	if m.cursor != 2 {
+		t.Fatalf("cursor not clamped: %d", m.cursor)
+	}
+	if _, ok := m.gitStatus["aaa"]; ok {
+		t.Fatal("git status of a removed project kept")
+	}
+}
+
+// TestMissingProjectDoesNotWidenColumns: a missing project with a long name must not
+// widen the columns, or removing it (D) would shift the status, port & duration columns.
+func TestMissingProjectDoesNotWidenColumns(t *testing.T) {
+	m, _ := testModel(t)
+	before := m.columns(m.rows())
+	m.cfg.Projects["a-really-long-project-name-that-is-gone"] = config.Project{Scripts: []string{".:x"}}
+	if after := m.columns(m.rows()); after != before {
+		t.Fatalf("columns changed: %+v -> %+v", before, after)
+	}
+	if out := m.View(); !strings.Contains(out, "a-really-long-project-name-that-is-gone  missing") {
+		t.Fatalf("missing project not rendered in full:\n%s", out)
+	}
+}
+
+// TestColumnsDoNotShrinkWhenProjectGoesMissing: when a project's folder is deleted, its row
+// turns into "missing" -- the remaining rows' columns must stay where they were.
+func TestColumnsDoNotShrinkWhenProjectGoesMissing(t *testing.T) {
+	m, _ := testModel(t)
+	m.cfg.Projects["a-long-project-name"] = config.Project{Scripts: []string{".:dev"}}
+	long := discovery.Project{Name: "a-long-project-name", Path: "/w/long", Scripts: []discovery.Script{{Dir: ".", Name: "dev"}}}
+	m = update(t, m, projectsMsg{projects: append(sampleProjects(), long)})
+	before := strings.Split(m.View(), "\n")[1]
+	m = update(t, m, projectsMsg{projects: sampleProjects()})
+	if after := strings.Split(m.View(), "\n")[1]; after != before {
+		t.Fatalf("the alpha row moved:\n%q\n%q", before, after)
+	}
+}

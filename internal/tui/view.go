@@ -51,7 +51,7 @@ func (m Model) View() string {
 	panel := m.crashPanel(rows)
 	panelLines := strings.Count(panel, "\n")
 	from, to := window(m.cursor, len(rows), m.height-8-extra-panelLines)
-	cols := m.columns(rows)
+	cols := m.cols.grow(m.columns(rows))
 	for i := from; i < to; i++ {
 		segs := m.rowSegs(rows[i], cols)
 		var base *lipgloss.Style
@@ -104,6 +104,8 @@ const (
 const noGit = "no git"
 
 // columns: the main view's column widths based on all rows (so they don't jump while scrolling).
+// Missing projects are left out: their row has no columns to align, and removing one
+// from the config must not shift the others.
 type columns struct {
 	name int // the name column including the indent
 	git  int
@@ -113,6 +115,9 @@ type columns struct {
 func (m Model) columns(rows []row) columns {
 	c := columns{name: 10, port: minPortWidth}
 	for _, r := range rows {
+		if r.missing {
+			continue
+		}
 		if r.kind == rowProject {
 			c.name = max(c.name, 2+runewidth.StringWidth(r.project))
 			st, ok := m.gitStatus[r.project]
@@ -132,6 +137,10 @@ func (m Model) columns(rows []row) columns {
 	return c
 }
 
+func (c columns) grow(o columns) columns {
+	return columns{name: max(c.name, o.name), git: max(c.git, o.git), port: max(c.port, o.port)}
+}
+
 // fit: pads the text to exactly w wide, truncating anything too long with "...".
 func fit(s string, w int) string {
 	return runewidth.FillRight(runewidth.Truncate(s, w, "…"), w)
@@ -143,7 +152,7 @@ func (m Model) renderRow(r row, c columns) string { return joinSegs(m.rowSegs(r,
 func (m Model) rowSegs(r row, c columns) []seg {
 	if r.kind == rowProject {
 		if r.missing {
-			return []seg{{"  " + fit(r.project, c.name-2) + "  missing (D: remove from config)", styleDim}}
+			return []seg{{"  " + runewidth.FillRight(r.project, c.name-2) + "  missing (D: remove from config)", styleDim}}
 		}
 		arrow := "▾"
 		if m.collapsed[r.project] {

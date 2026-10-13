@@ -70,6 +70,7 @@ type Model struct {
 	mode      mode
 	width     int
 	height    int
+	cols      columns // the widest columns so far: they only grow, so nothing jumps when rows go away
 	confirm   confirmDialog
 	picker    picker
 	log       logView
@@ -95,6 +96,7 @@ type (
 		err     error
 	}
 	gitTickMsg   struct{}
+	scanTickMsg  struct{}
 	clockTickMsg struct{}
 	actionMsg    struct {
 		err  error
@@ -133,7 +135,7 @@ func New(deps Deps, cfg config.Config, cfgErr error) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.subscribeCmd(), m.scanCmd(), gitTick(), clockTick()}
+	cmds := []tea.Cmd{m.subscribeCmd(), m.scanCmd(), gitTick(), scanTick(), clockTick()}
 	if m.splash {
 		cmds = append(cmds, splashTimer())
 	}
@@ -163,6 +165,12 @@ func waitTasks(ch <-chan []task.Info) tea.Cmd {
 
 func gitTick() tea.Cmd {
 	return tea.Tick(30*time.Second, func(time.Time) tea.Msg { return gitTickMsg{} })
+}
+
+// scanTick: a periodic rescan, so projects added to or removed from the root show up
+// without restarting.
+func scanTick() tea.Cmd {
+	return tea.Tick(3*time.Second, func(time.Time) tea.Msg { return scanTickMsg{} })
 }
 
 // clockTick: a redraw every second, so running tasks' elapsed time updates live.
@@ -202,6 +210,15 @@ func (m Model) refreshAllGit() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.step(msg)
+	if nm, ok := next.(Model); ok {
+		nm.cols = nm.cols.grow(nm.columns(nm.rows()))
+		next = nm
+	}
+	return next, cmd
+}
+
+func (m Model) step(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -221,10 +238,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.flash = "reading projects: " + msg.err.Error()
 			return m, nil
 		}
-		m.projects, m.scanned = msg.projects, true
-		m.clampCursor()
-		m.maybeEndSplash()
-		return m, m.refreshAllGit()
+		return m, m.applyProjects(msg.projects)
 	case gitMsg:
 		if msg.err == nil {
 			m.gitStatus[msg.project] = msg.status
@@ -232,6 +246,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case gitTickMsg:
 		return m, tea.Batch(m.refreshAllGit(), gitTick())
+	case scanTickMsg:
+		return m, tea.Batch(m.scanCmd(), scanTick())
 	case clockTickMsg:
 		return m, clockTick()
 	case splashDoneMsg:
@@ -284,6 +300,50 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// applyProjects adopts a (re)scan's result, keeping the cursor on the same row, and
+// fetches the git status of the projects that were not known yet.
+func (m *Model) applyProjects(list []discovery.Project) tea.Cmd {
+	rows := m.rows()
+	var cur *row
+	if m.cursor < len(rows) {
+		cur = &rows[m.cursor]
+	}
+	prev := map[string]bool{}
+	for _, p := range m.projects {
+		prev[p.Name] = true
+	}
+	var cmds []tea.Cmd
+	present := map[string]bool{}
+	for _, p := range list {
+		present[p.Name] = true
+		if !prev[p.Name] && p.IsGit {
+			cmds = append(cmds, m.gitCmd(p))
+		}
+	}
+	for name := range m.gitStatus {
+		if !present[name] {
+			delete(m.gitStatus, name)
+		}
+	}
+	m.projects, m.scanned = list, true
+	if cur != nil {
+		m.cursor = findRow(m.rows(), *cur, m.cursor)
+	}
+	m.clampCursor()
+	m.maybeEndSplash()
+	return tea.Batch(cmds...)
+}
+
+// findRow: the index of r in rows (the same task, or the same project's header), else fallback.
+func findRow(rows []row, r row, fallback int) int {
+	for i, x := range rows {
+		if x.kind == r.kind && x.project == r.project && (r.kind != rowTask || x.spec.ID() == r.spec.ID()) {
+			return i
+		}
+	}
+	return fallback
 }
 
 // applyTasks adopts the new state; if a built-in operation just finished,
