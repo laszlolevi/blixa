@@ -42,8 +42,9 @@ blixa --root <dir>  # set (or change) the projects root directory
 ```
 
 On the very first run, if no config file exists yet and `--root` wasn't given, blixa asks
-"Where are your projects?" and saves the answer to the config. Afterwards, `--root` can be
-used at any time to change the saved root.
+"Where are your projects?" (suggesting the current directory, or its parent if it is a
+project itself) and saves the answer to the config. Afterwards, `--root` can be used at any
+time to change the saved root.
 
 ### What counts as a project
 

@@ -82,3 +82,36 @@ func TestConfigureRootSwitchKeepsSelectionsPerRoot(t *testing.T) {
 		t.Fatalf("root a's selections were lost: %+v", saved)
 	}
 }
+
+func TestConfigureRootSuggestsWorkingDir(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	wd := filepath.Join(os.Getenv("HOME"), "dev")
+	os.Mkdir(wd, 0o755)
+	t.Chdir(wd)
+	cfgPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := config.Default()
+	var out strings.Builder
+	if err := configureRoot(&cfg, cfgPath, "", strings.NewReader("\n"), &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "[~/dev]") || cfg.Root != "~/dev" {
+		t.Fatalf("out=%q root=%q", out.String(), cfg.Root)
+	}
+}
+
+func TestConfigureRootSuggestsParentOfProject(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	wd := filepath.Join(os.Getenv("HOME"), "dev", "api")
+	os.MkdirAll(wd, 0o755)
+	os.WriteFile(filepath.Join(wd, "package.json"), []byte("{}"), 0o644)
+	t.Chdir(wd)
+	cfgPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := config.Default()
+	var out strings.Builder
+	if err := configureRoot(&cfg, cfgPath, "", strings.NewReader("\n"), &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "[~/dev]") || cfg.Root != "~/dev" {
+		t.Fatalf("out=%q root=%q", out.String(), cfg.Root)
+	}
+}

@@ -86,17 +86,24 @@ func runTUI(rootFlag string) error {
 }
 
 // configureRoot saves the root given with --root; on the very first run (no config file
-// yet) it asks where the projects live instead.
+// yet) it asks where the projects live instead, suggesting the working directory.
 func configureRoot(cfg *config.Config, cfgPath, rootFlag string, in io.Reader, out io.Writer) error {
 	root := rootFlag
 	if root == "" {
 		if _, err := os.Stat(cfgPath); err == nil {
 			return nil
 		}
-		fmt.Fprintf(out, "Where are your projects? [%s] ", cfg.Root)
+		suggested := cfg.Root
+		if wd, err := os.Getwd(); err == nil {
+			if _, err := os.Stat(filepath.Join(wd, "package.json")); err == nil {
+				wd = filepath.Dir(wd) // started inside a project: its parent holds the projects
+			}
+			suggested = paths.Collapse(wd)
+		}
+		fmt.Fprintf(out, "Where are your projects? [%s] ", suggested)
 		line, _ := bufio.NewReader(in).ReadString('\n')
 		if root = strings.TrimSpace(line); root == "" {
-			root = cfg.Root
+			root = suggested
 		}
 	}
 	abs, err := filepath.Abs(paths.Expand(root))
