@@ -10,9 +10,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"blixa/internal/api"
 	"blixa/internal/config"
 	"blixa/internal/daemon"
 	"blixa/internal/discovery"
@@ -20,6 +23,7 @@ import (
 	"blixa/internal/paths"
 	"blixa/internal/task"
 	"blixa/internal/tui"
+	"blixa/internal/update"
 	"blixa/internal/version"
 )
 
@@ -48,6 +52,10 @@ func runTUI(rootFlag string) error {
 		}
 	} else if rootFlag != "" {
 		return fmt.Errorf("cannot set root, the config is invalid: %w", cfgErr)
+	}
+
+	if err := maybeUpdate(defaultUpdateDeps(), os.Stdin, os.Stdout); err != nil {
+		return err
 	}
 
 	ver := version.Get()
@@ -115,4 +123,70 @@ func configureRoot(cfg *config.Config, cfgPath, rootFlag string, in io.Reader, o
 	}
 	cfg.SetRoot(paths.Collapse(abs))
 	return config.Save(cfgPath, *cfg)
+}
+
+// updateDeps: what maybeUpdate needs from the outside world (replaced in tests).
+type updateDeps struct {
+	DaemonRunning func() bool
+	Current       string // version.Tag() of the running binary
+	Latest        func() (string, error)
+	Apply         func(tag string) error
+	Exec          func() error // re-executes the (replaced) binary; returns only on failure
+}
+
+func defaultUpdateDeps() updateDeps {
+	u := update.Default()
+	exe, exeErr := os.Executable()
+	if exeErr == nil {
+		exe, exeErr = filepath.EvalSymlinks(exe) // replace the real file, not a symlink to it
+	}
+	return updateDeps{
+		DaemonRunning: func() bool {
+			_, err := (&api.Client{Socket: paths.SocketPath()}).Version()
+			return err == nil
+		},
+		Current: version.Tag(),
+		Latest: func() (string, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return u.Latest(ctx)
+		},
+		Apply: func(tag string) error {
+			if exeErr != nil {
+				return exeErr
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			return u.Apply(ctx, tag, exe)
+		},
+		Exec: func() error { return syscall.Exec(exe, os.Args, os.Environ()) },
+	}
+}
+
+// maybeUpdate: when no daemon is running (so nothing runs the old binary), offers a newer
+// release and on yes replaces the binary and re-executes it. A failed check stays silent,
+// a failed update continues with the current version.
+func maybeUpdate(d updateDeps, in io.Reader, out io.Writer) error {
+	if d.DaemonRunning() {
+		return nil
+	}
+	latest, err := d.Latest()
+	if err != nil || !update.Newer(d.Current, latest) {
+		return nil
+	}
+	fmt.Fprintf(out, "blixa %s is available (you have %s). Update now? [Y/n] ", latest, d.Current)
+	line, _ := bufio.NewReader(in).ReadString('\n')
+	if ans := strings.TrimSpace(line); ans != "" && !strings.EqualFold(ans, "y") {
+		return nil
+	}
+	fmt.Fprintf(out, "downloading %s…\n", latest)
+	if err := d.Apply(latest); err != nil {
+		fmt.Fprintf(out, "blixa: update failed: %v\n", err)
+		return nil
+	}
+	fmt.Fprintf(out, "updated to %s\n", latest)
+	if err := d.Exec(); err != nil {
+		return fmt.Errorf("updated to %s, but could not restart (%v) -- run blixa again", latest, err)
+	}
+	return nil
 }

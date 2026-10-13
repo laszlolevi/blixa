@@ -47,6 +47,12 @@ On the very first run, if no config file exists yet and `--root` wasn't given, b
 project itself) and saves the answer to the config. Afterwards, `--root` can be used at any
 time to change the saved root.
 
+When blixa starts and no daemon is running, it checks GitHub for a newer release
+(pre-releases don't count) and offers to update. On yes, it downloads the release, verifies
+its checksum, replaces its own binary and restarts as the new version. If the check fails
+(e.g. offline), blixa starts as usual without asking. Local builds (`dev …`, `+dirty`)
+never check.
+
 ### What counts as a project
 
 A project is any direct subdirectory of the root that contains a `package.json`. Git is
