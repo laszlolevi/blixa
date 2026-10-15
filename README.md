@@ -151,3 +151,7 @@ remote was rebased) — asking first if that would drop commits found only local
 - Config: `~/.config/blixa/config.json` (`root`, and the selected scripts per project, kept
   separately for every root — switching folders and back restores the selections)
 - State and logs: `~/.local/state/blixa/` (`state.json`, `logs/`, `daemon.log`)
+
+## License
+
+MIT, see [LICENSE](LICENSE).
