@@ -8,12 +8,12 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"blixa/internal/config"
-	"blixa/internal/discovery"
-	"blixa/internal/git"
-	"blixa/internal/paths"
-	"blixa/internal/supervisor"
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/config"
+	"github.com/laszlolevi/blixa/internal/discovery"
+	"github.com/laszlolevi/blixa/internal/git"
+	"github.com/laszlolevi/blixa/internal/paths"
+	"github.com/laszlolevi/blixa/internal/supervisor"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 // Client: the part of the daemon API the TUI uses (implemented by *api.Client).

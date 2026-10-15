@@ -19,7 +19,7 @@ var (
 	value string
 )
 
-// tag is set by the release build: -ldflags "-X blixa/internal/version.tag=v1.2.3".
+// tag is set by the release build: -ldflags "-X github.com/laszlolevi/blixa/internal/version.tag=v1.2.3".
 var tag string
 
 // pseudoVersion matches the timestamp-revision part of a Go pseudo-version, which go build

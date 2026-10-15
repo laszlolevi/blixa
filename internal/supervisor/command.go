@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"blixa/internal/discovery"
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/discovery"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 // nvmLoad loads nvm (if installed), so npm runs with the default Node version

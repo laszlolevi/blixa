@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 func TestShellQuote(t *testing.T) {

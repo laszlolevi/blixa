@@ -7,9 +7,9 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"blixa/internal/config"
-	"blixa/internal/discovery"
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/config"
+	"github.com/laszlolevi/blixa/internal/discovery"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 type confirmOption struct {

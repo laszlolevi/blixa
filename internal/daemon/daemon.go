@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"blixa/internal/api"
-	"blixa/internal/paths"
-	"blixa/internal/supervisor"
+	"github.com/laszlolevi/blixa/internal/api"
+	"github.com/laszlolevi/blixa/internal/paths"
+	"github.com/laszlolevi/blixa/internal/supervisor"
 )
 
 // Run: the daemon main loop; runs until a shutdown request or SIGTERM/SIGINT.

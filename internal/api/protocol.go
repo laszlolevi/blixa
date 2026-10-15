@@ -3,8 +3,8 @@
 package api
 
 import (
-	"blixa/internal/supervisor"
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/supervisor"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 type Request struct {

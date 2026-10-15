@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 // LogPath: <stateDir>/logs/<project>-<path hash>/<dir:script or @builtin>.log, with '/' encoded.

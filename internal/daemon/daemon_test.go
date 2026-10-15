@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"blixa/internal/api"
-	"blixa/internal/paths"
+	"github.com/laszlolevi/blixa/internal/api"
+	"github.com/laszlolevi/blixa/internal/paths"
 )
 
 func TestRunServesAndShutsDown(t *testing.T) {

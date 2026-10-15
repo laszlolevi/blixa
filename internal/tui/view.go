@@ -10,9 +10,9 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-runewidth"
 
-	"blixa/internal/paths"
-	"blixa/internal/supervisor"
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/paths"
+	"github.com/laszlolevi/blixa/internal/supervisor"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 const footer = "s start  x stop  r restart  l log  p pull  c checkout  i install  e scripts  / filter  a all  tab folder  o open  ? help  q quit"

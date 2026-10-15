@@ -13,11 +13,11 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-runewidth"
 
-	"blixa/internal/config"
-	"blixa/internal/discovery"
-	"blixa/internal/git"
-	"blixa/internal/supervisor"
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/config"
+	"github.com/laszlolevi/blixa/internal/discovery"
+	"github.com/laszlolevi/blixa/internal/git"
+	"github.com/laszlolevi/blixa/internal/supervisor"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 // TestViewRowBudgetAccountsForCfgErrAndCrashPanel: the config-error line and the

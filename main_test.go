@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"blixa/internal/config"
+	"github.com/laszlolevi/blixa/internal/config"
 )
 
 func TestConfigureRootFromFlag(t *testing.T) {

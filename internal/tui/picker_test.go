@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"blixa/internal/config"
-	"blixa/internal/git"
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/config"
+	"github.com/laszlolevi/blixa/internal/git"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 func TestScriptPickerTogglesAndSaves(t *testing.T) {

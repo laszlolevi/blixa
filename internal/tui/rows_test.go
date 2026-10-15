@@ -3,8 +3,8 @@ package tui
 import (
 	"testing"
 
-	"blixa/internal/config"
-	"blixa/internal/discovery"
+	"github.com/laszlolevi/blixa/internal/config"
+	"github.com/laszlolevi/blixa/internal/discovery"
 )
 
 func sampleProjects() []discovery.Project {

@@ -1,4 +1,4 @@
-module blixa
+module github.com/laszlolevi/blixa
 
 go 1.27.2
 

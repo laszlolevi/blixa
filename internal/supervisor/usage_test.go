@@ -3,7 +3,7 @@ package supervisor
 import (
 	"testing"
 
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 func TestParseGroupUsageSumsPerGroup(t *testing.T) {

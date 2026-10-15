@@ -8,9 +8,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"blixa/internal/config"
-	"blixa/internal/discovery"
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/config"
+	"github.com/laszlolevi/blixa/internal/discovery"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 // rootsModel: a model with two root tabs, the second one being a real temp folder.

@@ -12,11 +12,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"blixa/internal/config"
-	"blixa/internal/discovery"
-	"blixa/internal/git"
-	"blixa/internal/supervisor"
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/config"
+	"github.com/laszlolevi/blixa/internal/discovery"
+	"github.com/laszlolevi/blixa/internal/git"
+	"github.com/laszlolevi/blixa/internal/supervisor"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 type fakeClient struct {

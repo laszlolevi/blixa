@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 var (

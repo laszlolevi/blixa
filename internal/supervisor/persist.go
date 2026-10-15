@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 // PortOwner: who is listening on a port -- an blixa task (TaskID) or an external process.

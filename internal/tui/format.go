@@ -10,8 +10,8 @@ import (
 
 	"github.com/mattn/go-runewidth"
 
-	"blixa/internal/git"
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/git"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 func statusText(info *task.Info) string {

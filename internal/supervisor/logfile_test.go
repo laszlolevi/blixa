@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 func TestLogPath(t *testing.T) {

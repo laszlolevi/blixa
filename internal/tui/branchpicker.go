@@ -8,8 +8,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattn/go-runewidth"
 
-	"blixa/internal/git"
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/git"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 // The checkout picker has two lists, each in its own frame and with its own cursor, so

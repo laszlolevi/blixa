@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 func TestMain(m *testing.M) {

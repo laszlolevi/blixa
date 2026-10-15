@@ -4,9 +4,9 @@ import (
 	"sort"
 	"strings"
 
-	"blixa/internal/config"
-	"blixa/internal/discovery"
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/config"
+	"github.com/laszlolevi/blixa/internal/discovery"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 type rowKind int

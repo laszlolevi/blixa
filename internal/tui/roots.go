@@ -9,8 +9,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"blixa/internal/git"
-	"blixa/internal/paths"
+	"github.com/laszlolevi/blixa/internal/git"
+	"github.com/laszlolevi/blixa/internal/paths"
 )
 
 // rootChooser: the folder chooser in the top frame -- a path input with tab completion.

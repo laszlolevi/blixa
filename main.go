@@ -15,16 +15,16 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"blixa/internal/api"
-	"blixa/internal/config"
-	"blixa/internal/daemon"
-	"blixa/internal/discovery"
-	"blixa/internal/git"
-	"blixa/internal/paths"
-	"blixa/internal/task"
-	"blixa/internal/tui"
-	"blixa/internal/update"
-	"blixa/internal/version"
+	"github.com/laszlolevi/blixa/internal/api"
+	"github.com/laszlolevi/blixa/internal/config"
+	"github.com/laszlolevi/blixa/internal/daemon"
+	"github.com/laszlolevi/blixa/internal/discovery"
+	"github.com/laszlolevi/blixa/internal/git"
+	"github.com/laszlolevi/blixa/internal/paths"
+	"github.com/laszlolevi/blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/tui"
+	"github.com/laszlolevi/blixa/internal/update"
+	"github.com/laszlolevi/blixa/internal/version"
 )
 
 func main() {

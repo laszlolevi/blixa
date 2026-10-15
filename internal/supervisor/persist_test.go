@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"blixa/internal/task"
+	"github.com/laszlolevi/blixa/internal/task"
 )
 
 func copyState(t *testing.T, from, to string) {
