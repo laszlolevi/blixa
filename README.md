@@ -111,7 +111,7 @@ The keys are always on the last line, the version in its bottom right corner; `?
 Every root used so far is a tab in the top frame. `tab` / `shift+tab` switch between them;
 `↑` on the first project row moves into the tabs, where `←` / `→` switch (the list below
 follows right away) and `↓` / `enter` / `esc` go back. `o` opens another folder (a path input,
-`tab` completes), `W` closes the current tab (after `enter` to confirm). Each root keeps its
+`tab` completes), `W` closes the current tab (after `y` to confirm). Each root keeps its
 own script selections; running tasks keep running when you switch. While the tabs have the
 focus, the details frame shows the folder: its path, how many projects it has (and how many
 with selected scripts), and the tasks running in it with their ports.

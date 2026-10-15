@@ -104,10 +104,10 @@ func TestCloseRootTab(t *testing.T) {
 	if m.mode != modeConfirm {
 		t.Fatal("W should ask first")
 	}
-	if m, _ := press(t, m, "y"); m.mode != modeConfirm {
-		t.Fatal("y should no longer close the tab")
+	if m, _ := press(t, m, "enter"); m.mode != modeConfirm {
+		t.Fatal("enter should not close the tab")
 	}
-	m, cmd := press(t, m, "enter")
+	m, cmd := press(t, m, "y")
 	m = update(t, m, run(t, cmd))
 	if m.cfg.Root != other {
 		t.Fatalf("the neighbouring tab should become current: %s", m.cfg.Root)

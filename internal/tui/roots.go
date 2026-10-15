@@ -205,7 +205,7 @@ func (m *Model) closeRoot() {
 	m.mode = modeConfirm
 	m.confirm = confirmDialog{
 		text: "Close the " + cur + " tab? Its script selections are forgotten, running tasks keep running.",
-		options: []confirmOption{{key: "enter", label: "close", cmd: func() tea.Msg {
+		options: []confirmOption{{key: "y", label: "close", cmd: func() tea.Msg {
 			return closeRootMsg{root: cur, next: next}
 		}}},
 	}
