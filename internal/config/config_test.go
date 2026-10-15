@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -149,5 +150,27 @@ func TestLegacyTopLevelProjectsMigrateToCurrentRoot(t *testing.T) {
 	}
 	if _, ok := raw["roots"].(map[string]any)["~/workspace"]; !ok {
 		t.Fatalf("selections must be stored under roots[~/workspace]:\n%s", data)
+	}
+}
+
+func TestKnownRootsKeepsEmptyRootsAndRemoveRoot(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	cfg := Default()
+	cfg.SetRoot("~/oss") // no selections under ~/workspace or ~/oss
+	cfg.SetRoot("~/work")
+	if err := Save(path, cfg); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(loaded.KnownRoots()); got != "[~/oss ~/work ~/workspace]" {
+		t.Fatalf("KnownRoots = %s", got)
+	}
+	loaded.RemoveRoot("~/oss")
+	loaded.RemoveRoot("~/work") // the current root stays
+	if got := fmt.Sprint(loaded.KnownRoots()); got != "[~/work ~/workspace]" {
+		t.Fatalf("after RemoveRoot: %s", got)
 	}
 }

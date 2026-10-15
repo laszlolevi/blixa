@@ -1,6 +1,7 @@
 package supervisor
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"testing"
@@ -50,5 +51,20 @@ func TestLookupPortOwnerAndGroupPorts(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected port %d in the group, got: %v", port, ports)
+	}
+}
+
+func TestMergePortsKeepsFirstSeenOrder(t *testing.T) {
+	cases := []struct{ prev, found, want []int }{
+		{nil, []int{3000, 9229}, []int{3000, 9229}},
+		{[]int{5173}, []int{3000, 5173}, []int{5173, 3000}}, // 3000 opened later: it goes after
+		{[]int{5173, 3000}, []int{3000}, []int{3000}},       // a closed port drops out
+		{[]int{5173}, nil, nil},
+	}
+	for _, c := range cases {
+		got := mergePorts(c.prev, c.found)
+		if fmt.Sprint(got) != fmt.Sprint(c.want) {
+			t.Errorf("mergePorts(%v, %v) = %v, want %v", c.prev, c.found, got, c.want)
+		}
 	}
 }

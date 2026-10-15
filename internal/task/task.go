@@ -23,18 +23,30 @@ type Spec struct {
 	Dir         string `json:"dir,omitempty"`    // script only: package dir, "." for the root
 	Script      string `json:"script,omitempty"` // script only
 	Branch      string `json:"branch,omitempty"` // checkout only
+	From        string `json:"from,omitempty"`   // checkout only: (re)create Branch at this ref, e.g. "origin/main"
 }
 
-// ID: for a script, "<project>/<dir>:<script>". The built-in operations (pull/checkout/install)
-// share one slot per project, so only one of them can run at a time.
+// ID: for a script, "<project path>/<dir>:<script>". It's built from the path, not the
+// name, so same-named projects under different roots don't collide. The built-in
+// operations (pull/checkout/install) share one slot per project, so only one of them
+// can run at a time.
 func (s Spec) ID() string {
 	if s.Kind == KindScript {
-		return s.Project + "/" + s.Dir + ":" + s.Script
+		return s.projectKey() + "/" + s.Dir + ":" + s.Script
 	}
-	return BuiltinID(s.Project)
+	return BuiltinID(s.projectKey())
 }
 
-func BuiltinID(project string) string { return project + "/@builtin" }
+// projectKey: the project's path; the name only for a spec persisted without one.
+func (s Spec) projectKey() string {
+	if s.ProjectPath != "" {
+		return s.ProjectPath
+	}
+	return s.Project
+}
+
+// BuiltinID: the built-in operations' ID for the project at projectPath.
+func BuiltinID(projectPath string) string { return projectPath + "/@builtin" }
 
 func (s Spec) Label() string {
 	switch s.Kind {
@@ -44,6 +56,9 @@ func (s Spec) Label() string {
 		}
 		return s.Dir + " › " + s.Script
 	case KindCheckout:
+		if s.From != "" {
+			return "checkout " + s.From
+		}
 		return "checkout " + s.Branch
 	default:
 		return string(s.Kind)
@@ -112,6 +127,8 @@ type Info struct {
 	StartedAt time.Time `json:"startedAt"`
 	RunningAt time.Time `json:"runningAt,omitempty"` // when the first LISTEN port showed up
 	EndedAt   time.Time `json:"endedAt,omitempty"`
+	CPU       float64   `json:"cpu,omitempty"`   // the process group's CPU, in percent of one core (while active)
+	MemKB     int64     `json:"memKB,omitempty"` // the process group's resident memory (while active)
 	Adopted   bool      `json:"adopted,omitempty"`
 	// ProcStart: the group leader process's start time (e.g. `ps -o lstart=`), so that
 	// after a restart we can detect if another process has since taken over the PID.

@@ -44,8 +44,8 @@ blixa --root <dir>  # set (or change) the projects root directory
 
 On the very first run, if no config file exists yet and `--root` wasn't given, blixa asks
 "Where are your projects?" (suggesting the current directory, or its parent if it is a
-project itself) and saves the answer to the config. Afterwards, `--root` can be used at any
-time to change the saved root.
+project itself) and saves the answer to the config. Afterwards the root can be changed inside
+the TUI (see [Folders](#folders)) or with `--root`.
 
 When blixa starts and no daemon is running, it checks GitHub for a newer release
 (pre-releases don't count) and offers to update. On yes, it downloads the release, verifies
@@ -70,16 +70,84 @@ A project's scripts come from the root `package.json`, plus its workspaces:
 npm, pnpm, yarn and bun are supported. The package manager is detected per project — from the
 `packageManager` field of `package.json` (corepack) first, then the lockfile (`pnpm-lock.yaml`,
 `yarn.lock`, `bun.lock`/`bun.lockb`, `package-lock.json`), npm by default — and used for both
-running scripts (`<pm> run <script>`) and installs (`<pm> install`). The project row shows the
-package manager when it isn't npm. If the detected one isn't installed, the task fails with
+running scripts (`<pm> run <script>`) and installs (`<pm> install`). The details frame shows a
+project's package manager. If the detected one isn't installed, the task fails with
 `blixa: <pm> is not installed`.
 
 nvm is optional: when it's installed and the project has an `.nvmrc`, blixa switches to that
 Node version first; otherwise the system node on `PATH` is used.
 
+## The screen
+
+```
+▰ blixa ─ ~/workspace   daemon ●
+╭─ folders ────────────────────────────────────────────────────────────╮
+│  ~/oss │ ~/workspace          ↑ folders  tab switch  o open  W close │
+╰──────────────────────────────────────────────────────────────────────╯
+╭─ projects ───────────────────────────────────────────────────────────╮
+│ ▾ shop-api      feature/checkout-redesign ✎ ↓2                       │
+│     dev         ● running     :3000 +2    11m33s                     │
+╰──────────────────────────────────────────────────────────────────────╯
+╭─ shop-api › dev ─────────────────────────────────────────────────────╮
+│ primary port  :3000  →  http://localhost:3000                        │
+│ other ports   :3001  :9229                                           │
+│ usage         cpu 12%  ·  mem 340 MB                                 │
+╰──────────────────────────────────────────────────────────────────────╯
+ s start  x stop  r restart  l log  p pull  c checkout  …  ? help  q quit
+```
+
+The keys are always on the last line, the version in its bottom right corner; `?` lists all keys.
+
+### Folders
+
+Every root used so far is a tab in the top frame. `tab` / `shift+tab` switch between them;
+`↑` on the first project row moves into the tabs, where `←` / `→` switch (the list below
+follows right away) and `↓` / `enter` / `esc` go back. `o` opens another folder (a path input,
+`tab` completes), `W` closes the current tab (after `enter` to confirm). Each root keeps its
+own script selections; running tasks keep running when you switch. While the tabs have the
+focus, the details frame shows the folder: its path, how many projects it has (and how many
+with selected scripts), and the tasks running in it with their ports.
+
+### Projects
+
+A project row shows the git branch (with `↑` ahead, `↓` behind, `✎` uncommitted changes) —
+as wide as the frame allows — and, while it runs, failed, or for a few seconds after it
+succeeded, the last pull / checkout / install. Every 5 minutes (and shortly after start)
+blixa fetches the current root's git projects in the background, so `↑` / `↓` stay honest;
+the fetch never prompts for credentials and gives up after 2 minutes. `D` on a "missing"
+project (one still listed in `config.json` whose folder no longer exists under the root)
+removes it from the config.
+
+### Details
+
+The bottom frame has a fixed height (nothing moves when something shows up) and describes
+the row under the cursor:
+- a task: its **primary port** (the first one it opened, usually the dev server) with its
+  URL, the other ports, and its CPU (percent of one core, summed over the process group) and
+  memory; if it crashed or exited with an error, the log's last lines instead.
+- a project: the full branch name, the package manager and the last operation.
+
+Ports are terminal hyperlinks (OSC 8): ⌘-click one to open it in the browser (iTerm2,
+Ghostty, WezTerm, Kitty; Terminal.app only recognizes the full URL).
+
+### Log view
+
+Line numbers (`#` toggles them), `/` search with highlighted matches (`n`: next), `f` follow.
+Scroll with the arrows, page keys, or the mouse wheel / touchpad. The mouse is captured only
+in the log view, so select text there with ⌥-drag (iTerm2) / fn-drag (Terminal.app) /
+⇧-drag (Ghostty, Kitty, WezTerm).
+
+### Checkout
+
+`c` opens two lists, local branches on top and remote ones below, each with its own cursor;
+`tab` / `←` / `→` switch between them, typing filters both. Both are sorted by name and show
+each branch's last commit's age; the current branch is marked with its `↑` / `↓`, a remote
+branch with `= local` / `≠ local` when a local branch of the same name exists. `enter` on a
+remote branch creates the local one, or resets an existing local one to it (e.g. after the
+remote was rebased) — asking first if that would drop commits found only locally.
+
+## Files
+
 - Config: `~/.config/blixa/config.json` (`root`, and the selected scripts per project, kept
-  separately for every root — switching with `--root` and back restores the selections)
+  separately for every root — switching folders and back restores the selections)
 - State and logs: `~/.local/state/blixa/` (`state.json`, `logs/`, `daemon.log`)
-- Keys: `?` inside the TUI.
-- `D`: on a "missing" project (one that's still listed in `config.json` but whose folder
-  no longer exists under the root) removes it from the config.

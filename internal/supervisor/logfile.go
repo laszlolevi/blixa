@@ -2,6 +2,8 @@ package supervisor
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
 	"errors"
 	"io/fs"
 	"os"
@@ -11,11 +13,32 @@ import (
 	"blixa/internal/task"
 )
 
-// LogPath: <stateDir>/logs/<project>/<task ID without the project>.log, with '/' encoded.
+// LogPath: <stateDir>/logs/<project>-<path hash>/<dir:script or @builtin>.log, with '/' encoded.
 func LogPath(stateDir string, s task.Spec) string {
-	name := strings.TrimPrefix(s.ID(), s.Project+"/")
+	name := "@builtin"
+	if s.Kind == task.KindScript {
+		name = s.Dir + ":" + s.Script
+	}
 	name = strings.ReplaceAll(name, "/", "%2F")
-	return filepath.Join(stateDir, "logs", s.Project, name+".log")
+	// the folder is named after the project, plus a hash of its path: same-named projects
+	// under different roots get their own logs
+	sum := sha1.Sum([]byte(s.ProjectPath))
+	dir := s.Project + "-" + hex.EncodeToString(sum[:4])
+	return filepath.Join(stateDir, "logs", dir, name+".log")
+}
+
+// ExistingLogPath: LogPath, or the log's place before the path hash was added to the
+// folder name, if only that exists -- a task started by an older blixa still writes there.
+func ExistingLogPath(stateDir string, s task.Spec) string {
+	p := LogPath(stateDir, s)
+	if _, err := os.Stat(p); err == nil {
+		return p
+	}
+	legacy := filepath.Join(stateDir, "logs", s.Project, filepath.Base(p))
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy
+	}
+	return p
 }
 
 // OpenLog: rotates the existing log to .log.1, and opens a new, empty file in append mode.

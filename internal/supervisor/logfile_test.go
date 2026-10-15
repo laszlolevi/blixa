@@ -10,13 +10,19 @@ import (
 )
 
 func TestLogPath(t *testing.T) {
-	ws := task.Spec{Project: "p", Kind: task.KindScript, Dir: "apps/server", Script: "dev"}
-	if got := LogPath("/s", ws); got != "/s/logs/p/apps%2Fserver:dev.log" {
+	ws := task.Spec{Project: "p", ProjectPath: "/w/p", Kind: task.KindScript, Dir: "apps/server", Script: "dev"}
+	got := LogPath("/s", ws)
+	if dir, file := filepath.Split(got); !strings.HasPrefix(dir, "/s/logs/p-") || file != "apps%2Fserver:dev.log" {
 		t.Errorf("ws: %s", got)
 	}
-	pull := task.Spec{Project: "p", Kind: task.KindPull}
-	if got := LogPath("/s", pull); got != "/s/logs/p/@builtin.log" {
+	pull := task.Spec{Project: "p", ProjectPath: "/w/p", Kind: task.KindPull}
+	if got := LogPath("/s", pull); filepath.Base(got) != "@builtin.log" || filepath.Dir(got) != filepath.Dir(LogPath("/s", ws)) {
 		t.Errorf("pull: %s", got)
+	}
+	other := ws
+	other.ProjectPath = "/other/p" // the same name under another root
+	if LogPath("/s", other) == LogPath("/s", ws) {
+		t.Error("same-named projects under different roots must not share a log")
 	}
 }
 
@@ -68,5 +74,23 @@ func TestTruncateHead(t *testing.T) {
 	}
 	if err := TruncateHead(filepath.Join(t.TempDir(), "missing.log"), 10); err != nil {
 		t.Fatalf("a missing file must not be an error: %v", err)
+	}
+}
+
+func TestExistingLogPathFallsBackToTheLegacyPlace(t *testing.T) {
+	dir := t.TempDir()
+	spec := task.Spec{Project: "p", ProjectPath: "/w/p", Kind: task.KindScript, Dir: ".", Script: "dev"}
+	if got := ExistingLogPath(dir, spec); got != LogPath(dir, spec) {
+		t.Fatalf("with no log at all: %s", got)
+	}
+	legacy := filepath.Join(dir, "logs", "p", ".:dev.log")
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy, []byte("old\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := ExistingLogPath(dir, spec); got != legacy {
+		t.Fatalf("a task started by an older blixa: %s", got)
 	}
 }

@@ -38,6 +38,22 @@ func statusText(info *task.Info) string {
 	return string(info.Status)
 }
 
+// hyperlink wraps text in an OSC 8 link: the terminal opens url on ⌘-click, whatever the
+// text says (terminals without OSC 8 support just show the text).
+func hyperlink(url, text string) string {
+	return "\x1b]8;;" + url + "\x1b\\" + text + "\x1b]8;;\x1b\\"
+}
+
+func localURL(port int) string { return fmt.Sprintf("http://localhost:%d", port) }
+
+// memText: resident memory in MB, or GB from 1 GB up.
+func memText(kb int64) string {
+	if kb >= 1<<20 {
+		return fmt.Sprintf("%.1f GB", float64(kb)/(1<<20))
+	}
+	return fmt.Sprintf("%d MB", kb>>10)
+}
+
 func portText(info *task.Info) string {
 	if info == nil || len(info.Ports) == 0 {
 		return ""
@@ -108,6 +124,43 @@ func gitTextWidth(st git.Status, ok bool, w int) string {
 		return runewidth.Truncate(full, w, "…")
 	}
 	return runewidth.Truncate(st.Branch, bw, "…") + suffix
+}
+
+// ago: a short relative age, e.g. "5m ago", "3h ago", "2d ago", "4mo ago".
+func ago(now, t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	d := now.Sub(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 60*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	case d < 365*24*time.Hour:
+		return fmt.Sprintf("%dmo ago", int(d.Hours()/24/30))
+	}
+	return fmt.Sprintf("%dy ago", int(d.Hours()/24/365))
+}
+
+// opShownFor: how long a successful operation stays on the project row.
+const opShownFor = 10 * time.Second
+
+// rowOpText: the operation as the project row shows it -- while it runs, if it failed,
+// and for a few seconds after it succeeded; otherwise nothing (the details frame has it).
+func rowOpText(info *task.Info, now time.Time) string {
+	if info == nil {
+		return ""
+	}
+	ok := info.Status == task.StatusExited && info.ExitCode == 0
+	if ok && now.Sub(info.EndedAt) > opShownFor {
+		return ""
+	}
+	return builtinText(info)
 }
 
 // builtinText: a summary of the project's last built-in operation, e.g. "pull ✔ 10:31".

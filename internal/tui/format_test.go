@@ -98,3 +98,33 @@ func TestTailLines(t *testing.T) {
 		t.Fatal("expected nil for a missing file")
 	}
 }
+
+func TestMemText(t *testing.T) {
+	for kb, want := range map[int64]string{340 << 10: "340 MB", 1536 << 10: "1.5 GB", 512: "0 MB"} {
+		if got := memText(kb); got != want {
+			t.Errorf("memText(%d) = %q, want %q", kb, got, want)
+		}
+	}
+}
+
+func TestRowOpTextShowsOnlyRunningFailedOrJustFinished(t *testing.T) {
+	now := time.Date(2026, 10, 15, 18, 0, 0, 0, time.UTC)
+	pull := task.Spec{Project: "p", ProjectPath: "/w/p", Kind: task.KindPull}
+	cases := []struct {
+		info task.Info
+		want string
+	}{
+		{task.Info{Spec: pull, Status: task.StatusRunning, StartedAt: now}, "pull ● 18:00"},
+		{task.Info{Spec: pull, Status: task.StatusExited, ExitCode: 1, EndedAt: now.Add(-time.Hour)}, "pull ✖ 17:00"},
+		{task.Info{Spec: pull, Status: task.StatusExited, EndedAt: now.Add(-5 * time.Second)}, "pull ✔ 17:59"},
+		{task.Info{Spec: pull, Status: task.StatusExited, EndedAt: now.Add(-time.Minute)}, ""},
+	}
+	for _, c := range cases {
+		if got := rowOpText(&c.info, now); got != c.want {
+			t.Errorf("%s exit %d: %q, want %q", c.info.Status, c.info.ExitCode, got, c.want)
+		}
+	}
+	if rowOpText(nil, now) != "" {
+		t.Error("no operation: nothing")
+	}
+}

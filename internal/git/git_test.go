@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -80,7 +81,37 @@ func TestStatusBranchesFetch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(branches) != 2 || branches[0] != "main" || branches[1] != "feature/x" {
-		t.Fatalf("branches = %v", branches)
+	names := map[string]Branch{}
+	for _, b := range branches {
+		names[b.FullName()] = b
+	}
+	if len(branches) != 3 || names["main"].Remote != "" || names["origin/main"].Remote != "origin" || names["origin/feature/x"].Date.IsZero() {
+		t.Fatalf("branches = %+v", branches)
+	}
+	if names["main"].Hash == names["origin/main"].Hash {
+		t.Fatal("main is ahead and behind: its hash differs from origin/main")
+	}
+	if n, err := LocalOnlyCommits(work, "main", "origin/main"); err != nil || n != 1 {
+		t.Fatalf("LocalOnlyCommits = %d, %v (c.txt is only local)", n, err)
+	}
+}
+
+func TestBranchesByName(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+	dir := t.TempDir()
+	gitCmd(t, dir, "init", "-b", "main")
+	commitFile(t, dir, "a.txt", "a")
+	gitCmd(t, dir, "branch", "Zeta")
+	gitCmd(t, dir, "branch", "alpha")
+	branches, err := Branches(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, b := range branches {
+		names = append(names, b.Name)
+	}
+	if got := strings.Join(names, ","); got != "alpha,main,Zeta" {
+		t.Fatalf("by name, case-insensitively: %s", got)
 	}
 }

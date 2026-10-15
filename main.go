@@ -84,7 +84,9 @@ func runTUI(rootFlag string) error {
 		StreamLog:  c.StreamLog,
 		Scan:       discovery.Scan,
 		GitStatus:  git.GetStatus,
-		Branches: func(dir string) ([]string, error) {
+		Fetch:      git.Fetch,
+		LocalOnly:  git.LocalOnlyCommits,
+		Branches: func(dir string) ([]git.Branch, error) {
 			_ = git.Fetch(dir) // on a network error, list from local knowledge
 			return git.Branches(dir)
 		},

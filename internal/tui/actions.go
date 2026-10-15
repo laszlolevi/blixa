@@ -33,6 +33,8 @@ func (m Model) updateMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		if m.cursor > 0 {
 			m.cursor--
+		} else {
+			m.folderFocus = true // up from the first row: into the folder tabs
 		}
 		return m, nil
 	case "down", "j":
@@ -50,6 +52,15 @@ func (m Model) updateMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "?":
 		m.mode = modeHelp
+		return m, nil
+	case "tab":
+		return m.stepRoot(1)
+	case "shift+tab":
+		return m.stepRoot(-1)
+	case "o":
+		return m.openRootChooser()
+	case "W":
+		m.closeRoot()
 		return m, nil
 	case "q":
 		return m, tea.Quit
@@ -135,13 +146,17 @@ func (m Model) updateFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // builtinCmd: pull / checkout / install; only one can run per project at a time.
 func (m Model) builtinCmd(p discovery.Project, kind task.Kind, branch string) tea.Cmd {
-	if info, ok := m.tasks[task.BuiltinID(p.Name)]; ok && info.Status.Active() {
+	return m.builtinSpecCmd(task.Spec{Project: p.Name, ProjectPath: p.Path, Kind: kind, Branch: branch})
+}
+
+// builtinSpecCmd: starts a built-in operation, unless one is already running on the project.
+func (m Model) builtinSpecCmd(spec task.Spec) tea.Cmd {
+	if info, ok := m.tasks[task.BuiltinID(spec.ProjectPath)]; ok && info.Status.Active() {
 		label := info.Spec.Label()
 		return func() tea.Msg {
 			return actionMsg{err: fmt.Errorf("a task is already running on this project: %s", label)}
 		}
 	}
-	spec := task.Spec{Project: p.Name, ProjectPath: p.Path, Kind: kind, Branch: branch}
 	c := m.deps.Client
 	return func() tea.Msg {
 		_, err := c.Start(spec)

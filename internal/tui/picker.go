@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mattn/go-runewidth"
 
 	"blixa/internal/config"
 	"blixa/internal/discovery"
@@ -25,12 +26,6 @@ type picker struct {
 	items   []pickerItem
 	input   textinput.Model
 	cursor  int // index into the visible() list
-}
-
-type branchesMsg struct {
-	project  string
-	branches []string
-	err      error
 }
 
 func newPicker(title, project string, multi bool, items []pickerItem) picker {
@@ -91,21 +86,6 @@ func (m Model) beginCheckout(p discovery.Project) (tea.Model, tea.Cmd) {
 	return m, load
 }
 
-func (m Model) openBranchPicker(msg branchesMsg) (tea.Model, tea.Cmd) {
-	if msg.err != nil {
-		m.flash = "branches: " + msg.err.Error()
-		return m, nil
-	}
-	m.flash = ""
-	items := make([]pickerItem, 0, len(msg.branches))
-	for _, b := range msg.branches {
-		items = append(items, pickerItem{label: b, value: b})
-	}
-	m.picker = newPicker(msg.project+" - checkout (enter: switch, esc: cancel)", msg.project, false, items)
-	m.mode = modeBranches
-	return m, textinput.Blink
-}
-
 func (m Model) updatePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
@@ -127,18 +107,9 @@ func (m Model) updatePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.toggleScript()
 		}
 	case "enter":
-		if m.mode == modeScripts {
-			m.mode = modeMain
-			m.clampCursor()
-			return m, nil
-		}
-		i, ok := m.picker.selected()
-		if !ok {
-			return m, nil
-		}
-		p, _ := m.project(m.picker.project)
 		m.mode = modeMain
-		return m, m.builtinCmd(p, task.KindCheckout, m.picker.items[i].value)
+		m.clampCursor()
+		return m, nil
 	}
 	var cmd tea.Cmd
 	m.picker.input, cmd = m.picker.input.Update(msg)
@@ -169,14 +140,27 @@ func (m Model) toggleScript() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// maxPickerLabel: past this, a label is cut so the details column stays on screen.
+const maxPickerLabel = 60
+
 func (m Model) viewPicker() string {
 	p := m.picker
 	var b strings.Builder
 	b.WriteString(styleAccent.Render(p.title) + "\n" + p.input.View() + "\n\n")
 	vis := p.visible()
 	from, to := window(p.cursor, len(vis), m.height-5)
+	// the details (a script's command, a branch's age) line up in one column
+	labelW := 0
+	for _, i := range vis {
+		labelW = max(labelW, runewidth.StringWidth(p.items[i].label))
+	}
+	labelW = min(labelW, maxPickerLabel)
 	for vi := from; vi < to; vi++ {
 		it := p.items[vis[vi]]
+		label := it.label
+		if it.detail != "" {
+			label = fit(label, labelW)
+		}
 		mark := ""
 		if p.multi {
 			mark = "[ ] "
@@ -188,9 +172,9 @@ func (m Model) viewPicker() string {
 		if it.checked {
 			markStyle = styleCheck
 		}
-		line := markStyle.Render(mark) + it.label
+		line := markStyle.Render(mark) + label
 		if vi == p.cursor {
-			line = joinSegs([]seg{{mark, markStyle}, {it.label, stylePlain}}, &styleCursor)
+			line = joinSegs([]seg{{mark, markStyle}, {label, stylePlain}}, &styleCursor)
 		}
 		if it.detail != "" {
 			line += "  " + styleDim.Render(it.detail)

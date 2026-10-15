@@ -26,6 +26,11 @@ func BuildCommand(s task.Spec) (string, error) {
 		if s.Branch == "" {
 			return "", errors.New("missing branch")
 		}
+		if s.From != "" {
+			// -B: creates the branch, or resets an existing one, at From (tracking it, as
+			// From is a remote branch)
+			return "git checkout -B " + shellQuote(s.Branch) + " " + shellQuote(s.From), nil
+		}
 		return "git checkout " + shellQuote(s.Branch), nil
 	case task.KindInstall:
 		cmd = pm + " install"

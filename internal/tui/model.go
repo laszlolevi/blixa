@@ -35,7 +35,9 @@ type Deps struct {
 	StreamLog  func(ctx context.Context, id string) (<-chan string, error)
 	Scan       func(root string) ([]discovery.Project, error)
 	GitStatus  func(dir string) (git.Status, error)
-	Branches   func(dir string) ([]string, error)
+	Branches   func(dir string) ([]git.Branch, error)
+	Fetch      func(dir string) error // periodic background fetch; nil: none
+	LocalOnly  func(dir, local, upstream string) (int, error)
 	Now        func() time.Time
 	Splash     bool   // show the logo splash on startup
 	Version    string // shown on the splash
@@ -73,7 +75,11 @@ type Model struct {
 	cols      columns // the widest columns so far: they only grow, so nothing jumps when rows go away
 	confirm   confirmDialog
 	picker    picker
+	branches  branchPicker
 	log       logView
+	chooser   rootChooser
+	// the arrow keys act on the folder tabs instead of the project list
+	folderFocus bool
 
 	splash        bool
 	splashMinDone bool
@@ -87,15 +93,18 @@ type (
 	disconnectedMsg struct{}
 	reconnectMsg    struct{}
 	projectsMsg     struct {
+		root     string // the root it was scanned under: a result for a previous root is dropped
 		projects []discovery.Project
 		err      error
 	}
 	gitMsg struct {
 		project string
+		path    string // a result for a same-named project of a previous root is dropped
 		status  git.Status
 		err     error
 	}
 	gitTickMsg   struct{}
+	fetchTickMsg struct{}
 	scanTickMsg  struct{}
 	clockTickMsg struct{}
 	actionMsg    struct {
@@ -135,7 +144,7 @@ func New(deps Deps, cfg config.Config, cfgErr error) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.subscribeCmd(), m.scanCmd(), gitTick(), scanTick(), clockTick()}
+	cmds := []tea.Cmd{m.subscribeCmd(), m.scanCmd(), gitTick(), scanTick(), clockTick(), fetchTick(firstFetchDelay)}
 	if m.splash {
 		cmds = append(cmds, splashTimer())
 	}
@@ -163,6 +172,38 @@ func waitTasks(ch <-chan []task.Info) tea.Cmd {
 	}
 }
 
+// The background fetch keeps the ↑/↓ counts honest: without it they'd only change when
+// a pull or checkout happens to fetch.
+const (
+	firstFetchDelay = 10 * time.Second
+	fetchInterval   = 5 * time.Minute
+)
+
+func fetchTick(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(time.Time) tea.Msg { return fetchTickMsg{} })
+}
+
+// fetchAll: fetches every git project of the current root, then refreshes its status;
+// a project with a pull / checkout / install in progress is skipped.
+func (m Model) fetchAll() tea.Cmd {
+	if m.deps.Fetch == nil {
+		return nil
+	}
+	fetch, gs := m.deps.Fetch, m.deps.GitStatus
+	var cmds []tea.Cmd
+	for _, p := range m.projects {
+		if info := m.builtin(p.Name); !p.IsGit || (info != nil && info.Status.Active()) {
+			continue
+		}
+		cmds = append(cmds, func() tea.Msg {
+			_ = fetch(p.Path) // offline / no access: the status is still refreshed from what's known
+			st, err := gs(p.Path)
+			return gitMsg{project: p.Name, path: p.Path, status: st, err: err}
+		})
+	}
+	return tea.Batch(cmds...)
+}
+
 func gitTick() tea.Cmd {
 	return tea.Tick(30*time.Second, func(time.Time) tea.Msg { return gitTickMsg{} })
 }
@@ -179,7 +220,8 @@ func clockTick() tea.Cmd {
 }
 
 func (m Model) scanCmd() tea.Cmd {
-	root, scan := paths.Expand(m.cfg.Root), m.deps.Scan
+	cfgRoot := m.cfg.Root
+	root, scan := paths.Expand(cfgRoot), m.deps.Scan
 	// the daemon runs with $HOME as its cwd, so a relative root would be relative to that,
 	// not to the user's expected working directory -- make it absolute before passing it to Scan.
 	if abs, err := filepath.Abs(root); err == nil {
@@ -187,7 +229,7 @@ func (m Model) scanCmd() tea.Cmd {
 	}
 	return func() tea.Msg {
 		ps, err := scan(root)
-		return projectsMsg{projects: ps, err: err}
+		return projectsMsg{root: cfgRoot, projects: ps, err: err}
 	}
 }
 
@@ -195,7 +237,7 @@ func (m Model) gitCmd(p discovery.Project) tea.Cmd {
 	gs := m.deps.GitStatus
 	return func() tea.Msg {
 		st, err := gs(p.Path)
-		return gitMsg{project: p.Name, status: st, err: err}
+		return gitMsg{project: p.Name, path: p.Path, status: st, err: err}
 	}
 }
 
@@ -213,6 +255,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.step(msg)
 	if nm, ok := next.(Model); ok {
 		nm.cols = nm.cols.grow(nm.columns(nm.rows()))
+		// the mouse is captured only in the log view (for wheel / touchpad scrolling): elsewhere
+		// the terminal keeps it, so text can still be selected and copied as usual
+		switch {
+		case m.mode != modeLog && nm.mode == modeLog:
+			cmd = tea.Batch(cmd, tea.EnableMouseCellMotion)
+		case m.mode == modeLog && nm.mode != modeLog:
+			cmd = tea.Batch(cmd, tea.DisableMouse)
+		}
 		next = nm
 	}
 	return next, cmd
@@ -234,16 +284,24 @@ func (m Model) step(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case reconnectMsg:
 		return m, m.subscribeCmd()
 	case projectsMsg:
+		if msg.root != "" && msg.root != m.cfg.Root {
+			return m, nil
+		}
 		if msg.err != nil {
 			m.flash = "reading projects: " + msg.err.Error()
 			return m, nil
 		}
 		return m, m.applyProjects(msg.projects)
 	case gitMsg:
+		if p, ok := m.project(msg.project); msg.path != "" && (!ok || p.Path != msg.path) {
+			return m, nil
+		}
 		if msg.err == nil {
 			m.gitStatus[msg.project] = msg.status
 		}
 		return m, nil
+	case fetchTickMsg:
+		return m, tea.Batch(m.fetchAll(), fetchTick(fetchInterval))
 	case gitTickMsg:
 		return m, tea.Batch(m.refreshAllGit(), gitTick())
 	case scanTickMsg:
@@ -275,6 +333,15 @@ func (m Model) step(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.openBranchPicker(msg)
 	case logLinesMsg:
 		return m.updateLogLines(msg)
+	case localOnlyMsg:
+		return m.applyLocalOnly(msg)
+	case closeRootMsg:
+		return m.applyCloseRoot(msg)
+	case tea.MouseMsg:
+		if m.mode == modeLog && !m.log.searching {
+			return m, m.log.scroll(msg)
+		}
+		return m, nil
 	case quitMsg:
 		return m, tea.Quit
 	case tea.KeyMsg:
@@ -287,13 +354,21 @@ func (m Model) step(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch m.mode {
 		case modeMain:
+			if m.chooser.active {
+				return m.updateRootChooser(msg)
+			}
+			if m.folderFocus {
+				return m.updateFolders(msg)
+			}
 			return m.updateMain(msg)
 		case modeConfirm:
 			return m.updateConfirm(msg)
 		case modeLog:
 			return m.updateLog(msg)
-		case modeScripts, modeBranches:
+		case modeScripts:
 			return m.updatePicker(msg)
+		case modeBranches:
+			return m.updateBranchPicker(msg)
 		case modeHelp:
 			m.mode = modeMain
 			return m, nil
@@ -363,6 +438,18 @@ func (m *Model) applyTasks(list []task.Info) tea.Cmd {
 	}
 	m.tasks = next
 	return tea.Batch(cmds...)
+}
+
+// builtin: the project's last built-in operation (pull / checkout / install), nil if none.
+func (m Model) builtin(name string) *task.Info {
+	p, ok := m.project(name)
+	if !ok {
+		return nil
+	}
+	if info, ok := m.tasks[task.BuiltinID(p.Path)]; ok {
+		return &info
+	}
+	return nil
 }
 
 func (m Model) project(name string) (discovery.Project, bool) {

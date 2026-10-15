@@ -53,6 +53,9 @@ func TestBuildCommandGitAndErrors(t *testing.T) {
 	if cmd, _ := BuildCommand(task.Spec{Kind: task.KindCheckout, Branch: "feature/x"}); cmd != "git checkout 'feature/x'" {
 		t.Errorf("checkout: %s", cmd)
 	}
+	if cmd, _ := BuildCommand(task.Spec{Kind: task.KindCheckout, Branch: "rel", From: "origin/rel"}); cmd != "git checkout -B 'rel' 'origin/rel'" {
+		t.Errorf("checkout from a remote branch: %s", cmd)
+	}
 	if _, err := BuildCommand(task.Spec{Kind: task.KindCheckout}); err == nil {
 		t.Error("empty branch: expected an error")
 	}

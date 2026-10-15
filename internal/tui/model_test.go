@@ -93,8 +93,10 @@ func testModel(t *testing.T) (Model, *fakeClient) {
 			return ch, nil
 		},
 		GitStatus: func(string) (git.Status, error) { return git.Status{Branch: "main"}, nil },
-		Branches:  func(string) ([]string, error) { return []string{"main", "feature/x"}, nil },
-		Now:       func() time.Time { return time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC) },
+		Branches: func(string) ([]git.Branch, error) {
+			return []git.Branch{{Name: "main"}, {Name: "feature/x", Remote: "origin"}}, nil
+		},
+		Now: func() time.Time { return time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC) },
 	}
 	m := New(deps, sampleConfig(), nil)
 	m = update(t, m, projectsMsg{projects: sampleProjects()})
@@ -160,7 +162,23 @@ func run(t *testing.T, cmd tea.Cmd) tea.Msg {
 	if cmd == nil {
 		t.Fatal("expected a command, got nil")
 	}
-	return cmd()
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		return msg
+	}
+	// a batch (e.g. reading the log + capturing the mouse): the first message of our own,
+	// skipping bubbletea's terminal-control messages
+	for _, c := range batch {
+		if c == nil {
+			continue
+		}
+		if msg := c(); !strings.HasPrefix(fmt.Sprintf("%T", msg), "tea.") {
+			return msg
+		}
+	}
+	t.Fatal("the batch has no message of our own")
+	return nil
 }
 
 func TestNavigationShowAllAndCollapse(t *testing.T) {
@@ -191,7 +209,7 @@ func TestStartStopRestart(t *testing.T) {
 	run(t, cmd)
 	_, cmd = press(t, m, "r")
 	run(t, cmd)
-	for _, c := range []string{"start alpha/.:start", "stop alpha/.:start", "restart alpha/.:start"} {
+	for _, c := range []string{"start /w/alpha/.:start", "stop /w/alpha/.:start", "restart /w/alpha/.:start"} {
 		if !fc.has(c) {
 			t.Errorf("missing call: %s (calls: %v)", c, fc.calls)
 		}
@@ -233,7 +251,7 @@ func TestPortConflictKillsThenStarts(t *testing.T) {
 	}
 	m, cmd = press(t, m, "k")
 	run(t, cmd)
-	if m.mode != modeMain || !fc.has("kill 42") || !fc.has("start alpha/.:start") {
+	if m.mode != modeMain || !fc.has("kill 42") || !fc.has("start /w/alpha/.:start") {
 		t.Fatalf("mode=%v calls=%v", m.mode, fc.calls)
 	}
 }
@@ -426,5 +444,42 @@ func TestColumnsDoNotShrinkWhenProjectGoesMissing(t *testing.T) {
 	m = update(t, m, projectsMsg{projects: sampleProjects()})
 	if after := strings.Split(m.View(), "\n")[1]; after != before {
 		t.Fatalf("the alpha row moved:\n%q\n%q", before, after)
+	}
+}
+
+func TestBackgroundFetchSkipsBusyAndNonGitProjects(t *testing.T) {
+	m, _ := testModel(t)
+	m.showAll = true
+	var mu sync.Mutex
+	var fetched []string
+	m.deps.Fetch = func(dir string) error {
+		mu.Lock()
+		fetched = append(fetched, dir)
+		mu.Unlock()
+		return nil
+	}
+	m.projects[0].IsGit, m.projects[1].IsGit = true, true
+	pull := task.Spec{Project: "beta", ProjectPath: m.projects[1].Path, Kind: task.KindPull}
+	m = update(t, m, tasksMsg{tasks: []task.Info{{Spec: pull, Status: task.StatusRunning}}})
+	msg := m.fetchAll()()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		batch = tea.BatchMsg{func() tea.Msg { return msg }}
+	}
+	for _, c := range batch {
+		if c != nil {
+			m = update(t, m, c())
+		}
+	}
+	if len(fetched) != 1 || fetched[0] != m.projects[0].Path {
+		t.Fatalf("only the idle git project should be fetched: %v", fetched)
+	}
+}
+
+func TestGitResultOfAPreviousRootIsDropped(t *testing.T) {
+	m, _ := testModel(t)
+	m = update(t, m, gitMsg{project: "alpha", path: "/elsewhere/alpha", status: git.Status{Branch: "stale"}})
+	if m.gitStatus["alpha"].Branch == "stale" {
+		t.Fatal("a same-named project's status from another root must not be applied")
 	}
 }

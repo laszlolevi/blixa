@@ -40,6 +40,11 @@ var (
 	styleDirty  = lipgloss.NewStyle().Foreground(colorOrange)
 	styleCheck  = lipgloss.NewStyle().Foreground(colorGreen)
 	stylePlain  = lipgloss.NewStyle()
+
+	styleActiveTab = lipgloss.NewStyle().Background(colorCursor).Foreground(colorAccent2).Bold(true)
+
+	styleMatch        = lipgloss.NewStyle().Background(colorYellow).Foreground(lipgloss.Color("#000000"))
+	styleCurrentMatch = lipgloss.NewStyle().Background(colorAccent2).Foreground(lipgloss.Color("#000000")).Bold(true)
 )
 
 // seg is a piece of a row with its own style. Rows are built from segments, so the

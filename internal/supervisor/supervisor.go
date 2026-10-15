@@ -28,6 +28,7 @@ type Options struct {
 	StopTimeout  time.Duration                   // default 5s
 	MaxLogSize   int64                           // default 10 MB
 	Ports        func(pgid int) ([]int, error)   // default GroupListenPorts
+	Usage        func() (map[int]Usage, error)   // default GroupUsage
 }
 
 type entry struct {
@@ -65,6 +66,9 @@ func New(opts Options) (*Supervisor, error) {
 	}
 	if opts.Ports == nil {
 		opts.Ports = GroupListenPorts
+	}
+	if opts.Usage == nil {
+		opts.Usage = GroupUsage
 	}
 	s := &Supervisor{opts: opts, tasks: map[string]*entry{}, subs: map[int]chan []task.Info{}}
 	if err := s.load(); err != nil {
@@ -151,6 +155,7 @@ func (s *Supervisor) wait(e *entry, cmd *exec.Cmd, logFile *os.File) {
 	e.info.ExitCode = code
 	e.info.EndedAt = time.Now()
 	e.info.Ports = nil
+	e.info.CPU, e.info.MemKB = 0, 0
 	close(e.done)
 	s.changedLocked()
 }
@@ -179,7 +184,7 @@ func (s *Supervisor) LogPathFor(id string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return LogPath(s.opts.StateDir, e.info.Spec), true
+	return ExistingLogPath(s.opts.StateDir, e.info.Spec), true
 }
 
 // Subscribe: immediately receives the current state, then every change.
@@ -208,6 +213,15 @@ func (s *Supervisor) Subscribe() (<-chan []task.Info, func()) {
 }
 
 func (s *Supervisor) changedLocked() {
+	s.notifyLocked()
+	if err := s.saveLocked(); err != nil {
+		fmt.Fprintf(os.Stderr, "blixa: saving state.json: %v\n", err)
+	}
+}
+
+// notifyLocked sends the current state to the subscribers, without saving it -- for
+// changes not worth a write to disk (CPU and memory change on every poll).
+func (s *Supervisor) notifyLocked() {
 	snapshot := s.listLocked()
 	for _, ch := range s.subs {
 		select {
@@ -215,9 +229,6 @@ func (s *Supervisor) changedLocked() {
 		default:
 		}
 		ch <- snapshot
-	}
-	if err := s.saveLocked(); err != nil {
-		fmt.Fprintf(os.Stderr, "blixa: saving state.json: %v\n", err)
 	}
 }
 
@@ -275,6 +286,7 @@ func (s *Supervisor) finishAdoptedLocked(e *entry, ev task.Event) {
 	}
 	e.info.Status = task.Transition(e.info.Status, ev)
 	e.info.Ports = nil
+	e.info.CPU, e.info.MemKB = 0, 0
 	e.info.EndedAt = time.Now()
 	s.changedLocked()
 }
@@ -346,13 +358,13 @@ func (s *Supervisor) poll() {
 			s.mu.Unlock()
 			continue
 		}
-		_ = TruncateHead(LogPath(s.opts.StateDir, spec), s.opts.MaxLogSize)
-		ports, err := s.opts.Ports(pid)
+		_ = TruncateHead(ExistingLogPath(s.opts.StateDir, spec), s.opts.MaxLogSize)
+		found, err := s.opts.Ports(pid)
 		if err != nil {
 			continue
 		}
 		s.mu.Lock()
-		if e.info.Status.Active() && !equalInts(ports, e.info.Ports) {
+		if ports := mergePorts(e.info.Ports, found); e.info.Status.Active() && !equalInts(ports, e.info.Ports) {
 			e.info.Ports = ports
 			if len(ports) > 0 {
 				e.info.LastPort = ports[0]
@@ -365,6 +377,58 @@ func (s *Supervisor) poll() {
 		}
 		s.mu.Unlock()
 	}
+	s.sampleUsage(active)
+}
+
+// sampleUsage: the active tasks' CPU and memory; sent to the TUI, but not saved.
+func (s *Supervisor) sampleUsage(active []*entry) {
+	if len(active) == 0 {
+		return
+	}
+	usage, err := s.opts.Usage()
+	if err != nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	changed := false
+	for _, e := range active {
+		if !e.info.Status.Active() {
+			continue
+		}
+		u := usage[e.info.PID] // PID is also the process group id
+		if u.CPU != e.info.CPU || u.MemKB != e.info.MemKB {
+			e.info.CPU, e.info.MemKB = u.CPU, u.MemKB
+			changed = true
+		}
+	}
+	if changed {
+		s.notifyLocked()
+	}
+}
+
+// mergePorts: the currently open ports in the order they were first seen -- the ones
+// still open from prev keep their place, new ones go to the end. So Ports[0] is the
+// first port the task opened (its primary port, usually the dev server).
+func mergePorts(prev, found []int) []int {
+	open := map[int]bool{}
+	for _, p := range found {
+		open[p] = true
+	}
+	var ports []int
+	seen := map[int]bool{}
+	for _, p := range prev {
+		if open[p] {
+			ports = append(ports, p)
+			seen[p] = true
+		}
+	}
+	for _, p := range found {
+		if !seen[p] {
+			ports = append(ports, p)
+		}
+	}
+	return ports
 }
 
 func equalInts(a, b []int) bool {

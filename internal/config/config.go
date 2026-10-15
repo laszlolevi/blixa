@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -41,16 +42,32 @@ func (c *Config) SetRoot(root string) {
 	}
 }
 
-// storeCurrent writes the current selections back under roots[root].
+// storeCurrent writes the current selections back under roots[root]. A root without
+// selections is kept too: every root in Roots is a tab in the TUI.
 func (c *Config) storeCurrent() {
 	if c.Roots == nil {
 		c.Roots = map[string]RootConfig{}
 	}
-	if len(c.Projects) == 0 {
-		delete(c.Roots, c.Root)
-		return
-	}
 	c.Roots[c.Root] = RootConfig{Projects: c.Projects}
+}
+
+// KnownRoots: every root used so far (the current one included), sorted.
+func (c Config) KnownRoots() []string {
+	roots := []string{c.Root}
+	for r := range c.Roots {
+		if r != c.Root {
+			roots = append(roots, r)
+		}
+	}
+	sort.Strings(roots)
+	return roots
+}
+
+// RemoveRoot forgets a root that isn't the current one, together with its selections.
+func (c *Config) RemoveRoot(root string) {
+	if root != c.Root {
+		delete(c.Roots, root)
+	}
 }
 
 // Ref is a script reference: "<package-dir>:<script-name>", the root dir being ".".
