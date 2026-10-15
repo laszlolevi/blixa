@@ -1,6 +1,6 @@
 # Builds the macOS binaries for a v* tag and publishes them as a GitHub release
-# (used by install.sh). Cross-compiled on Linux, which is cheaper than a macOS runner;
-# the test suite needs macOS (lsof, pgrep) and runs in the test workflow (test.yml).
+# (used by install.sh). The test suite (test.yml, on macOS: lsof, pgrep) has to pass
+# first; the build itself is cross-compiled on Linux, which is cheaper than a macOS runner.
 name: release
 
 on:
@@ -11,7 +11,12 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+    secrets: inherit
+
   release:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
