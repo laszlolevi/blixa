@@ -1,6 +1,7 @@
 # Builds the macOS binaries for a v* tag and publishes them as a GitHub release
-# (used by install.sh). The test suite (test.yml, on macOS: lsof, pgrep) has to pass
-# first; the build itself is cross-compiled on Linux, which is cheaper than a macOS runner.
+# (used by install.sh). Only a tag on a commit of main is released, and the test suite
+# (test.yml, on macOS: lsof, pgrep) has to pass first; the build itself is
+# cross-compiled on Linux, which is cheaper than a macOS runner.
 name: release
 
 on:
@@ -11,7 +12,21 @@ permissions:
   contents: write
 
 jobs:
+  on-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check that the tag is on main
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) is not on main"
+            exit 1
+          }
+
   test:
+    needs: on-main
     uses: ./.github/workflows/test.yml
     secrets: inherit
 
