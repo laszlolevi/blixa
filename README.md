@@ -2,7 +2,6 @@
 
 [![test](https://github.com/laszlolevi/blixa/actions/workflows/test.yml/badge.svg)](https://github.com/laszlolevi/blixa/actions/workflows/test.yml)
 [![coverage](https://codecov.io/gh/laszlolevi/blixa/graph/badge.svg)](https://codecov.io/gh/laszlolevi/blixa)
-[![Go Report Card](https://goreportcard.com/badge/github.com/laszlolevi/blixa)](https://goreportcard.com/report/github.com/laszlolevi/blixa)
 [![release](https://img.shields.io/github/v/release/laszlolevi/blixa)](https://github.com/laszlolevi/blixa/releases/latest)
 [![Go](https://img.shields.io/github/go-mod/go-version/laszlolevi/blixa)](go.mod)
 [![platform](https://img.shields.io/badge/platform-macOS-lightgrey)](#install)
