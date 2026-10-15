@@ -1,6 +1,6 @@
 # Builds the macOS binaries for a v* tag and publishes them as a GitHub release
 # (used by install.sh). Cross-compiled on Linux, which is cheaper than a macOS runner;
-# the test suite needs macOS (lsof, pgrep) and is run locally before tagging.
+# the test suite needs macOS (lsof, pgrep) and runs in the test workflow (test.yml).
 name: release
 
 on:

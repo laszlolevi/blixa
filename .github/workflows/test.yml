@@ -1,0 +1,26 @@
+# Runs the test suite on every push to main and on pull requests. It needs macOS: the
+# supervisor tests use lsof and pgrep the way the daemon does.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Format
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test ./...

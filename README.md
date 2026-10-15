@@ -32,7 +32,8 @@ go build -o ~/.local/bin/blixa .
 
 Push a `v*` tag (e.g. `git tag v0.1.0 && git push origin v0.1.0`); the `release` workflow
 builds the macOS binaries and publishes them as a GitHub release, which `install.sh` downloads.
-Run `go test ./...` on macOS before tagging (the CI only cross-compiles).
+The `test` workflow runs the test suite on macOS for every push to `main`; check that it passed
+before tagging (the release workflow itself only cross-compiles).
 
 ## Usage
 
