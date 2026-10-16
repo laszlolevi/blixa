@@ -46,6 +46,31 @@ func hyperlink(url, text string) string {
 
 func localURL(port int) string { return fmt.Sprintf("http://localhost:%d", port) }
 
+// portURL: the port's URL to open in the browser, or "" if it doesn't speak http(s).
+// A port not probed yet (or by an older daemon) counts as http.
+func portURL(info *task.Info, port int) string {
+	switch info.PortKinds[port] {
+	case "", "http":
+		return localURL(port)
+	case "https":
+		return fmt.Sprintf("https://localhost:%d", port)
+	}
+	return ""
+}
+
+// portLabel: ":port", followed by what speaks on it once that's known, linked if the
+// browser can open it.
+func portLabel(info *task.Info, port int) string {
+	text := fmt.Sprintf(":%d", port)
+	if url := portURL(info, port); url != "" {
+		text = hyperlink(url, text)
+	}
+	if kind := info.PortKinds[port]; kind != "" {
+		text += " " + kind
+	}
+	return text
+}
+
 // memText: resident memory in MB, or GB from 1 GB up.
 func memText(kb int64) string {
 	if kb >= 1<<20 {

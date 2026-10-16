@@ -153,6 +153,38 @@ func TestPackageManagerIsInTheDetailsOnly(t *testing.T) {
 	}
 }
 
+func TestPortsShowWhatSpeaksOnThem(t *testing.T) {
+	m, _ := testModel(t)
+	m = update(t, m, tea.WindowSizeMsg{Width: 100, Height: 20})
+	spec := m.rows()[1].spec
+	kinds := map[int]string{5173: "http", 1883: "mqtt", 8443: "https", 9229: "debug"}
+	m = update(t, m, tasksMsg{tasks: []task.Info{{Spec: spec, Status: task.StatusRunning, Ports: []int{5173, 1883, 8443, 9229}, PortKinds: kinds}}})
+	m.cursor = 1
+	_, details := m.details(m.rows())
+	raw := strings.Join(details, "\n")
+	panel := ansi.Strip(raw)
+	if !strings.Contains(panel, "primary port  :5173 http  →  http://localhost:5173") ||
+		!strings.Contains(panel, "other ports   :1883 mqtt  :8443 https  :9229 debug") {
+		t.Fatalf("the panel should show each port's protocol:\n%s", panel)
+	}
+	if !strings.Contains(raw, hyperlink("https://localhost:8443", ":8443")) {
+		t.Fatalf("an https port should link to https://: %q", raw)
+	}
+	if strings.Contains(raw, "localhost:1883") || strings.Contains(raw, "localhost:9229") {
+		t.Fatalf("a port the browser can't open should not be a link: %q", raw)
+	}
+
+	m = update(t, m, tasksMsg{tasks: []task.Info{{Spec: spec, Status: task.StatusRunning, Ports: []int{1883}, PortKinds: map[int]string{1883: "mqtt"}}}})
+	_, details = m.details(m.rows())
+	raw = strings.Join(details, "\n")
+	if panel := ansi.Strip(raw); !strings.Contains(panel, "primary port  :1883 mqtt\n") || strings.Contains(raw, "localhost:1883") {
+		t.Fatalf("an mqtt primary port: no URL, no link:\n%s", panel)
+	}
+	if row := m.renderRow(m.rows()[1], m.cols); strings.Contains(row, "localhost:1883") {
+		t.Fatalf("an mqtt primary port should not be a link in the row: %q", row)
+	}
+}
+
 func TestKeysStayAtTheBottomAndPortsShowPrimary(t *testing.T) {
 	m, _ := testModel(t)
 	m = update(t, m, tea.WindowSizeMsg{Width: 100, Height: 20})

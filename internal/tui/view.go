@@ -360,8 +360,8 @@ func (m Model) rowSegs(r row, c columns) []seg {
 	return append(segs, seg{"  ", stylePlain}, seg{durationText(info, m.deps.Now()), styleDim})
 }
 
-// portSegs: the primary port (the first one the task opened, ⌘-clickable) and the count
-// of the rest, fitted to width w.
+// portSegs: the primary port (⌘-clickable if it speaks http(s)) and the count of the
+// rest, fitted to width w.
 func portSegs(info *task.Info, w int) []seg {
 	text := fit(portText(info), w)
 	if info == nil || len(info.Ports) == 0 {
@@ -369,8 +369,12 @@ func portSegs(info *task.Info, w int) []seg {
 	}
 	primary, rest, found := strings.Cut(text, " +")
 	link := func(s string) string {
+		url := portURL(info, info.Ports[0])
+		if url == "" {
+			return s
+		}
 		trimmed := strings.TrimRight(s, " ")
-		return hyperlink(localURL(info.Ports[0]), trimmed) + s[len(trimmed):]
+		return hyperlink(url, trimmed) + s[len(trimmed):]
 	}
 	if !found {
 		return []seg{{link(text), stylePort}}
@@ -468,14 +472,16 @@ func (m Model) details(rows []row) (string, []string) {
 					lines = append(lines, styleDim.Render(cleanLine(l)))
 				}
 			} else {
-				// the ports and the URL are links: ⌘-click opens them in the browser
+				// the http(s) ports and the URL are links: ⌘-click opens them in the browser
 				primary, others := "", ""
 				if len(info.Ports) > 0 {
-					url := localURL(info.Ports[0])
-					primary = hyperlink(url, fmt.Sprintf(":%d", info.Ports[0])) + "  →  " + hyperlink(url, url)
+					primary = portLabel(&info, info.Ports[0])
+					if url := portURL(&info, info.Ports[0]); url != "" {
+						primary += "  →  " + hyperlink(url, url)
+					}
 					var o []string
 					for _, port := range info.Ports[1:] {
-						o = append(o, hyperlink(localURL(port), fmt.Sprintf(":%d", port)))
+						o = append(o, portLabel(&info, port))
 					}
 					others = strings.Join(o, "  ")
 				}

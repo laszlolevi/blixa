@@ -62,7 +62,23 @@ func TestMergePortsKeepsFirstSeenOrder(t *testing.T) {
 		{[]int{5173}, nil, nil},
 	}
 	for _, c := range cases {
-		got := mergePorts(c.prev, c.found)
+		got := mergePorts(c.prev, c.found, nil)
+		if fmt.Sprint(got) != fmt.Sprint(c.want) {
+			t.Errorf("mergePorts(%v, %v) = %v, want %v", c.prev, c.found, got, c.want)
+		}
+	}
+}
+
+func TestMergePortsPutsInspectorPortsLast(t *testing.T) {
+	kinds := map[int]string{3000: "http", 3001: "http", 8080: "http", 9229: KindDebug, 9230: KindDebug}
+	cases := []struct{ prev, found, want []int }{
+		{nil, []int{3000, 9229}, []int{3000, 9229}},
+		{[]int{9229}, []int{9229}, []int{9229}},                               // only the debugger is open yet
+		{[]int{9229}, []int{3000, 9229}, []int{3000, 9229}},                   // the app server opened later: it still becomes primary
+		{[]int{8080, 9230}, []int{3001, 8080, 9230}, []int{8080, 3001, 9230}}, // first-seen order among the rest
+	}
+	for _, c := range cases {
+		got := mergePorts(c.prev, c.found, kinds)
 		if fmt.Sprint(got) != fmt.Sprint(c.want) {
 			t.Errorf("mergePorts(%v, %v) = %v, want %v", c.prev, c.found, got, c.want)
 		}

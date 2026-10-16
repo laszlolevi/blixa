@@ -5,8 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
+	"slices"
 	"sort"
 	"sync"
 	"syscall"
@@ -28,13 +30,15 @@ type Options struct {
 	StopTimeout  time.Duration                   // default 5s
 	MaxLogSize   int64                           // default 10 MB
 	Ports        func(pgid int) ([]int, error)   // default GroupListenPorts
+	Probe        func(port int) string           // default ProbePort
 	Usage        func() (map[int]Usage, error)   // default GroupUsage
 }
 
 type entry struct {
 	info          task.Info
 	stopRequested bool
-	done          chan struct{} // closed when Wait returns; nil for an adopted task
+	done          chan struct{}  // closed when Wait returns; nil for an adopted task
+	kinds         map[int]string // what speaks on each open port; "" while it's being probed
 }
 
 type Supervisor struct {
@@ -66,6 +70,9 @@ func New(opts Options) (*Supervisor, error) {
 	}
 	if opts.Ports == nil {
 		opts.Ports = GroupListenPorts
+	}
+	if opts.Probe == nil {
+		opts.Probe = ProbePort
 	}
 	if opts.Usage == nil {
 		opts.Usage = GroupUsage
@@ -155,6 +162,8 @@ func (s *Supervisor) wait(e *entry, cmd *exec.Cmd, logFile *os.File) {
 	e.info.ExitCode = code
 	e.info.EndedAt = time.Now()
 	e.info.Ports = nil
+	e.info.PortKinds = nil
+	e.kinds = nil
 	e.info.CPU, e.info.MemKB = 0, 0
 	close(e.done)
 	s.changedLocked()
@@ -286,6 +295,8 @@ func (s *Supervisor) finishAdoptedLocked(e *entry, ev task.Event) {
 	}
 	e.info.Status = task.Transition(e.info.Status, ev)
 	e.info.Ports = nil
+	e.info.PortKinds = nil
+	e.kinds = nil
 	e.info.CPU, e.info.MemKB = 0, 0
 	e.info.EndedAt = time.Now()
 	s.changedLocked()
@@ -364,20 +375,62 @@ func (s *Supervisor) poll() {
 			continue
 		}
 		s.mu.Lock()
-		if ports := mergePorts(e.info.Ports, found); e.info.Status.Active() && !equalInts(ports, e.info.Ports) {
-			e.info.Ports = ports
-			if len(ports) > 0 {
-				e.info.LastPort = ports[0]
-				e.info.Status = task.Transition(e.info.Status, task.EventPortOpened)
-				if e.info.RunningAt.IsZero() {
-					e.info.RunningAt = time.Now()
-				}
-			}
-			s.changedLocked()
-		}
+		s.probeNewPortsLocked(e, found)
+		s.updatePortsLocked(e, found)
 		s.mu.Unlock()
 	}
 	s.sampleUsage(active)
+}
+
+// updatePortsLocked: takes the currently open ports (found) into the task's info.
+func (s *Supervisor) updatePortsLocked(e *entry, found []int) {
+	ports := mergePorts(e.info.Ports, found, e.kinds)
+	kinds := map[int]string{}
+	for _, p := range ports {
+		if kind := e.kinds[p]; kind != "" {
+			kinds[p] = kind
+		}
+	}
+	if !e.info.Status.Active() || (equalInts(ports, e.info.Ports) && maps.Equal(kinds, e.info.PortKinds)) {
+		return
+	}
+	e.info.Ports = ports
+	e.info.PortKinds = kinds
+	if len(ports) > 0 {
+		e.info.LastPort = ports[0]
+		e.info.Status = task.Transition(e.info.Status, task.EventPortOpened)
+		if e.info.RunningAt.IsZero() {
+			e.info.RunningAt = time.Now()
+		}
+	}
+	s.changedLocked()
+}
+
+// probeNewPortsLocked: finds out what speaks on each newly opened port, once per port --
+// in the background, since a probe can take a second and the port shows up right away
+// anyway; the result then reorders the ports, so a debugger port doesn't stay the
+// primary just because it opened before the app server.
+func (s *Supervisor) probeNewPortsLocked(e *entry, found []int) {
+	if e.kinds == nil {
+		e.kinds = map[int]string{}
+	}
+	maps.DeleteFunc(e.kinds, func(p int, _ string) bool { return !slices.Contains(found, p) })
+	for _, p := range found {
+		if _, ok := e.kinds[p]; ok {
+			continue
+		}
+		e.kinds[p] = ""
+		go func() {
+			kind := s.opts.Probe(p)
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			if k, ok := e.kinds[p]; !ok || k != "" { // closed (or the task restarted) meanwhile
+				return
+			}
+			e.kinds[p] = kind
+			s.updatePortsLocked(e, e.info.Ports)
+		}()
+	}
 }
 
 // sampleUsage: the active tasks' CPU and memory; sent to the TUI, but not saved.
@@ -408,9 +461,10 @@ func (s *Supervisor) sampleUsage(active []*entry) {
 }
 
 // mergePorts: the currently open ports in the order they were first seen -- the ones
-// still open from prev keep their place, new ones go to the end. So Ports[0] is the
-// first port the task opened (its primary port, usually the dev server).
-func mergePorts(prev, found []int) []int {
+// still open from prev keep their place, new ones go to the end -- except that debugger
+// (inspector) ports always come last. So Ports[0] is the first non-debugger port the
+// task opened (its primary port, usually the dev server).
+func mergePorts(prev, found []int, kinds map[int]string) []int {
 	open := map[int]bool{}
 	for _, p := range found {
 		open[p] = true
@@ -428,6 +482,7 @@ func mergePorts(prev, found []int) []int {
 			ports = append(ports, p)
 		}
 	}
+	sort.SliceStable(ports, func(i, j int) bool { return kinds[ports[i]] != KindDebug && kinds[ports[j]] == KindDebug })
 	return ports
 }
 

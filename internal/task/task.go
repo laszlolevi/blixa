@@ -118,18 +118,19 @@ func Transition(cur Status, ev Event) Status {
 
 // Info: a task's current state (the daemon persists this and sends it to the TUI).
 type Info struct {
-	Spec      Spec      `json:"spec"`
-	Status    Status    `json:"status"`
-	PID       int       `json:"pid"` // also the process group id
-	Ports     []int     `json:"ports,omitempty"`
-	LastPort  int       `json:"lastPort,omitempty"`
-	ExitCode  int       `json:"exitCode"`
-	StartedAt time.Time `json:"startedAt"`
-	RunningAt time.Time `json:"runningAt,omitempty"` // when the first LISTEN port showed up
-	EndedAt   time.Time `json:"endedAt,omitempty"`
-	CPU       float64   `json:"cpu,omitempty"`   // the process group's CPU, in percent of one core (while active)
-	MemKB     int64     `json:"memKB,omitempty"` // the process group's resident memory (while active)
-	Adopted   bool      `json:"adopted,omitempty"`
+	Spec      Spec           `json:"spec"`
+	Status    Status         `json:"status"`
+	PID       int            `json:"pid"` // also the process group id
+	Ports     []int          `json:"ports,omitempty"`
+	PortKinds map[int]string `json:"portKinds,omitempty"` // what speaks on each port: http, ws, debug, tcp, …
+	LastPort  int            `json:"lastPort,omitempty"`
+	ExitCode  int            `json:"exitCode"`
+	StartedAt time.Time      `json:"startedAt"`
+	RunningAt time.Time      `json:"runningAt,omitempty"` // when the first LISTEN port showed up
+	EndedAt   time.Time      `json:"endedAt,omitempty"`
+	CPU       float64        `json:"cpu,omitempty"`   // the process group's CPU, in percent of one core (while active)
+	MemKB     int64          `json:"memKB,omitempty"` // the process group's resident memory (while active)
+	Adopted   bool           `json:"adopted,omitempty"`
 	// ProcStart: the group leader process's start time (e.g. `ps -o lstart=`), so that
 	// after a restart we can detect if another process has since taken over the PID.
 	ProcStart string `json:"procStart,omitempty"`

@@ -88,6 +88,7 @@ func (s *Supervisor) load() error {
 			if !info.Adopted {
 				info.Status = task.Transition(info.Status, task.EventLost)
 				info.Ports = nil
+				info.PortKinds = nil
 				info.EndedAt = time.Now()
 			}
 		}

@@ -97,8 +97,8 @@ Node version first; otherwise the system node on `PATH` is used.
 │     dev         ● running     :3000 +2    11m33s                     │
 ╰──────────────────────────────────────────────────────────────────────╯
 ╭─ shop-api › dev ─────────────────────────────────────────────────────╮
-│ primary port  :3000  →  http://localhost:3000                        │
-│ other ports   :3001  :9229                                           │
+│ primary port  :3000 http  →  http://localhost:3000                   │
+│ other ports   :3001 ws  :9229 debug                                  │
 │ usage         cpu 12%  ·  mem 340 MB                                 │
 ╰──────────────────────────────────────────────────────────────────────╯
  s start  x stop  r restart  l log  p pull  c checkout  …  ? help  q quit
@@ -130,12 +130,15 @@ removes it from the config.
 
 The bottom frame has a fixed height (nothing moves when something shows up) and describes
 the row under the cursor:
-- a task: its **primary port** (the first one it opened, usually the dev server) with its
-  URL, the other ports, and its CPU (percent of one core, summed over the process group) and
-  memory; if it crashed or exited with an error, the log's last lines instead.
+- a task: its **primary port** (the first one it opened, usually the dev server; a debugger
+  port such as `node --inspect`'s only if nothing else is open) with its URL, the other
+  ports, and its CPU (percent of one core, summed over the process group) and memory; if it
+  crashed or exited with an error, the log's last lines instead. Next to each port is what
+  speaks on it — blixa probes every new port once: `http`, `https`, `ws`, `wss`, `debug`,
+  `grpc`, `mqtt`, `ssh`, `mysql`, `smtp`, `ftp`, `pop3`, `imap`, or `tcp` if none of these.
 - a project: the full branch name, the package manager and the last operation.
 
-Ports are terminal hyperlinks (OSC 8): ⌘-click one to open it in the browser (iTerm2,
+The http(s) ports are terminal hyperlinks (OSC 8): ⌘-click one to open it in the browser (iTerm2,
 Ghostty, WezTerm, Kitty; Terminal.app only recognizes the full URL).
 
 ### Log view
